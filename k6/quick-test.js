@@ -7,7 +7,7 @@ export const options = {
   iterations: 1,
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:9999';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const INDEX_NAME = __ENV.INDEX_NAME || 'demo';
 
 export default function () {

@@ -66,7 +66,7 @@ k6 run stress-test.js
 
 **With custom parameters:**
 ```bash
-k6 run -e BASE_URL=http://localhost:3000 -e INDEX_NAME=demo stress-test.js
+k6 run -e BASE_URL=http://localhost:8080 -e INDEX_NAME=demo stress-test.js
 ```
 
 ### 2. Load Test (`load-test.js`)
@@ -113,7 +113,7 @@ k6 run concurrency-test.js
 
 ## Environment Variables
 
-- `BASE_URL`: Base URL of the application (default: `http://localhost:3000`)
+- `BASE_URL`: Base URL of the application (default: `http://localhost:8080`)
 - `INDEX_NAME`: Quickwit index name to test against (default: `demo`)
 
 Example:
@@ -125,7 +125,7 @@ k6 run -e BASE_URL=https://my-qwui.example.com -e INDEX_NAME=logs stress-test.js
 
 ```bash
 docker run --rm -i --network=host \
-  -e BASE_URL=http://localhost:3000 \
+  -e BASE_URL=http://localhost:8080 \
   -e INDEX_NAME=demo \
   grafana/k6 run - <stress-test.js
 ```
