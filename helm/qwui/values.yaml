@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  # Use qwui-go or qwui-rust image
+  repository:  ghcr.io/gitarns/qwui-go
+  pullPolicy: IfNotPresent
+  # Defaults to chart appVersion
+  tag: ""
+
+imagePullSecrets: []
+# - name: my-registry-secret
+
+nameOverride: ""
+fullnameOverride: ""
+
+deploymentAnnotations: {}
+deploymentLabels: {}
+
+podAnnotations: {}
+podLabels: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  labels: {}
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  labels: {}
+  annotations: {}
+  hosts:
+    - host: qwui.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 500Mi
+
+quickwit:
+  url: "http://quickwit:7280"
+
+nodeSelector: {}
+
+# Extra environment variables
+extraEnv: []
+# - name: FOO
+#   value: bar

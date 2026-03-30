@@ -1,0 +1,6 @@
+apiVersion: v2
+name: qwui
+description: Quickwit UI — a lightweight frontend + backend for Quickwit search
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
