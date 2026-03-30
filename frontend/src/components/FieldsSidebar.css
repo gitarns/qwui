@@ -1,0 +1,460 @@
+.sidebar {
+  width: 300px;
+  background-color: var(--bg-tertiary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-index-selector {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-index-selector label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* React-Select custom option styles */
+.select-option-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+
+.select-star-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  transition: all 0.2s;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.select-star-btn:hover {
+  color: #fbbf24;
+  transform: scale(1.2);
+}
+
+.select-star-btn.active {
+  color: #f59e0b;
+}
+
+.dark-mode .select-star-btn.active {
+  color: #fbbf24;
+}
+
+.select-option-label {
+  flex: 1;
+  font-size: 0.875rem;
+}
+
+.select-star-inline {
+  color: #f59e0b;
+  font-size: 0.875rem;
+}
+
+.dark-mode .select-star-inline {
+  color: #fbbf24;
+}
+
+.field-search {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+}
+
+.field-search input {
+  width: 100%;
+  padding: 0.5rem 2rem 0.5rem 2rem;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.field-search input:focus {
+  outline: none;
+  border-color: #667eea;
+  background-color: var(--input-bg);
+}
+
+.clear-field-search-button {
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: var(--text-tertiary);
+  border: none;
+  color: var(--bg-primary);
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  z-index: 1;
+}
+
+.clear-field-search-button:hover {
+  background-color: var(--text-primary);
+}
+
+.sidebar-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+}
+
+.sidebar-header details {
+  cursor: pointer;
+}
+
+.sidebar-header summary {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-header summary::-webkit-details-marker {
+  display: none;
+}
+
+.section-title {
+  flex: 1;
+}
+
+.field-count {
+  background-color: var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.fields-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.selected-fields-list {
+  flex: 0 0 auto;
+  max-height: 200px;
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.popular-fields-list {
+  flex: 0 0 auto;
+  overflow-y: visible;
+}
+
+.field-item {
+  border-bottom: 1px solid var(--border-color-light);
+  background-color: var(--bg-secondary);
+  transition: background-color 0.15s;
+}
+
+.field-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.selected-field-item {
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.selected-field-item:hover {
+  background-color: var(--bg-secondary);
+}
+
+.selected-field-item .field-header {
+  cursor: pointer;
+}
+
+.field-header {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s;
+}
+
+.field-header:hover {
+  background-color: var(--border-color-light);
+}
+
+.field-header.expanded {
+  background-color: var(--bg-tertiary);
+}
+
+.field-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--border-color);
+  color: var(--text-tertiary);
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.field-name {
+   flex: 0 1 auto;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-expand-indicator {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  transition: color 0.15s;
+}
+
+.field-header:hover .field-expand-indicator {
+  color: var(--text-tertiary);
+}
+
+.add-column-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.add-column-btn:hover {
+  background-color: #006bb4;
+  border-color: #006bb4;
+  color: white;
+  transform: scale(1.1);
+}
+
+.add-column-btn.selected {
+  background-color: #006bb4;
+  border-color: #006bb4;
+  color: white;
+}
+
+.add-column-btn.selected:hover {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.field-doc-count {
+  background-color: #667eea;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.field-buckets {
+  padding: 0.25rem 0.5rem 0.5rem;
+  background-color: var(--bg-secondary);
+}
+
+.field-buckets.collapsed {
+  max-height: none;
+}
+
+.field-buckets.expanded {
+  max-height: none;
+}
+
+.bucket-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 3px;
+  margin-bottom: 0.15rem;
+}
+
+.bucket-item:hover {
+  background-color: var(--border-color-light);
+}
+
+.bucket-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.filter-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+.bucket-item:hover .filter-btn {
+  opacity: 1;
+}
+
+.filter-btn:hover {
+  background-color: var(--border-color);
+}
+
+.include-btn {
+  color: #10b981;
+}
+
+.include-btn:hover {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
+.exclude-btn {
+  color: #ef4444;
+}
+
+.exclude-btn:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.bucket-item.more-items {
+  color: #667eea;
+  font-weight: 500;
+  font-style: italic;
+  justify-content: center;
+  cursor: default;
+}
+
+.bucket-key {
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bucket-count {
+  color: var(--text-tertiary);
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.empty-state {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+}
+
+/* Scrollbar styling */
+.fields-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.fields-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.fields-list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.fields-list::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.field-header-main {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;      /* allow growing */
+  min-width: 0;         /* needed for ellipsis inside flex */
+}
+.popular-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #888);
+  padding: 6px 12px 4px;
+}
+
+.popular-field-item {
+  background: var(--popular-bg, rgba(102, 126, 234, 0.04));
+}
+
+.popular-section-divider {
+  height: 1px;
+  background: var(--border-color, #e0e0e0);
+  margin: 6px 0 4px;
+}

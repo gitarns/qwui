@@ -1,0 +1,59 @@
+services:
+  quickwit:
+    image: quickwit/quickwit:latest
+    ports:
+      - "7280:7280"
+    volumes:
+      - quickwit_data:/quickwit/qwdata
+    command: run
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7280/health/livez"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  qwui-go:
+    build:
+      context: .
+      dockerfile: Dockerfile.go
+    pull_policy: build
+    ports:
+      - "8080:8080"
+    environment:
+      - QUICKWIT_URL=http://quickwit:7280
+      - PORT=8080
+    depends_on:
+      quickwit:
+        condition: service_healthy
+    profiles:
+      - go
+
+  qwui-rust:
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
+    pull_policy: build
+    ports:
+      - "8080:8080"
+    environment:
+      - QUICKWIT_URL=http://quickwit:7280
+      - PORT=8080
+    depends_on:
+      quickwit:
+        condition: service_healthy
+    profiles:
+      - rust
+
+  data-generator:
+    image: python:3.12-alpine
+    depends_on:
+      quickwit:
+        condition: service_healthy
+    volumes:
+      - ./dev:/scripts
+    command: python /scripts/generate.py
+    restart: unless-stopped
+
+volumes:
+  quickwit_data:

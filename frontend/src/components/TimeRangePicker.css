@@ -1,0 +1,443 @@
+.time-range-picker {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  position: relative;
+}
+
+.time-range-button {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(to bottom, var(--input-bg), var(--bg-secondary));
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.time-range-button:hover {
+  border-color: #006bb4;
+  box-shadow: 0 2px 6px rgba(0, 107, 180, 0.15);
+  transform: translateY(-1px);
+}
+
+.time-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  min-width: 480px;
+  width: 480px;
+}
+
+.calendar-quick-select-btn {
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-color);
+  border-radius: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.25rem;
+  padding-right: 0.75rem;
+}
+
+.calendar-quick-select-btn:hover {
+  background: rgba(0, 107, 180, 0.1);
+}
+
+.time-part {
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.time-part:hover {
+  background: rgba(0, 107, 180, 0.1);
+}
+
+.time-separator {
+  color: var(--text-secondary);
+  font-weight: bold;
+}
+
+.relative-range-display {
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+  flex: 1;
+  text-align: left;
+}
+
+.relative-range-display:hover {
+  background: rgba(0, 107, 180, 0.1);
+}
+
+/* Dropdowns */
+.time-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Quick Select */
+.quick-select-dropdown {
+  min-width: 500px;
+  padding: 1rem;
+}
+
+.quick-select-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.5px;
+}
+
+.custom-quick-range {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.custom-quick-label {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.custom-quick-input {
+  width: 80px;
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.custom-quick-input:focus {
+  outline: none;
+  border-color: #006bb4;
+  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+}
+
+.custom-quick-select {
+  width: 100px;
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.custom-quick-select:focus {
+  outline: none;
+  border-color: #006bb4;
+  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+}
+
+.custom-quick-apply-btn {
+  padding: 0.5rem 1rem;
+  background: #006bb4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.custom-quick-apply-btn:hover:not(:disabled) {
+  background: #005a9e;
+  box-shadow: 0 2px 4px rgba(0, 107, 180, 0.3);
+}
+
+.custom-quick-apply-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quick-select-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.75rem 0;
+}
+
+.quick-select-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.quick-range-btn {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.quick-range-btn:hover {
+  background: rgba(0, 107, 180, 0.1);
+  border-color: #006bb4;
+}
+
+/* Time Popup */
+.time-popup {
+  position: absolute;
+  top: 100%;
+  margin-top: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  min-width: 350px;
+  animation: slideDown 0.15s ease-out;
+}
+
+.from-popup {
+  left: 0;
+}
+
+.to-popup {
+  right: 0;
+}
+
+/* Tabs */
+.time-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.75rem 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.time-tab {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.time-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.time-tab.active {
+  color: white;
+  background-color: #006bb4;
+  box-shadow: 0 2px 4px rgba(0, 107, 180, 0.3);
+}
+
+/* Tab Content */
+.time-tab-content {
+  padding: 1rem;
+}
+
+/* Absolute Tab */
+.absolute-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Override react-datepicker styles */
+.react-datepicker {
+  font-family: inherit;
+  border: none;
+  background: transparent;
+}
+
+.react-datepicker__header {
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name,
+.react-datepicker__day {
+  color: var(--text-primary);
+}
+
+.react-datepicker__day:hover {
+  background-color: rgba(0, 107, 180, 0.1);
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #006bb4;
+  color: white;
+}
+
+.react-datepicker__time-container {
+  border-left: 1px solid var(--border-color);
+}
+
+.react-datepicker__time-box {
+  background: var(--bg-secondary);
+}
+
+.react-datepicker__time-list-item {
+  color: var(--text-primary);
+}
+
+.react-datepicker__time-list-item:hover {
+  background-color: rgba(0, 107, 180, 0.1);
+}
+
+.react-datepicker__time-list-item--selected {
+  background-color: #006bb4;
+  color: white;
+}
+
+.dark-mode .react-datepicker__time-box {
+  background: #3d3d3d;
+}
+
+.dark-mode .react-datepicker__time-list-item {
+  color: #f3f4f6;
+}
+
+/* Relative Tab */
+.relative-tab {
+  padding: 1rem 0;
+}
+
+.relative-inputs {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.relative-value {
+  width: 80px;
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.relative-unit,
+.relative-direction {
+  flex: 1;
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.relative-value:focus,
+.relative-unit:focus,
+.relative-direction:focus {
+  outline: none;
+  border-color: #006bb4;
+  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+}
+
+/* Now Tab */
+.now-tab {
+  padding: 1rem 0;
+}
+
+.now-tab p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Footer */
+.time-popup-footer {
+  padding: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.apply-btn {
+  padding: 0.5rem 1.5rem;
+  background: #006bb4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.apply-btn:hover {
+  background: #005a9e;
+  box-shadow: 0 2px 4px rgba(0, 107, 180, 0.3);
+}
+
+.apply-btn:active {
+  transform: translateY(1px);
+}

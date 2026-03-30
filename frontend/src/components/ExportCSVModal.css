@@ -1,0 +1,129 @@
+.export-modal {
+  max-width: 550px;
+}
+
+.export-warning {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+}
+
+.warning-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.warning-content {
+  flex: 1;
+}
+
+.warning-content strong {
+  display: block;
+  color: #92400e;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.warning-content p {
+  margin: 0;
+  color: #78350f;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.export-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.export-info-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.info-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.info-value.export-count {
+  color: #006bb4;
+}
+
+.export-size-info {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.size-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.size-row:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.size-row.secondary {
+  opacity: 0.8;
+}
+
+.size-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.size-value {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.size-value.compressed {
+  color: #059669;
+  font-size: 1.1rem;
+}
+
+.size-value.download-size {
+  color: #f59e0b;
+}
+
+.export-note {
+  background: rgba(0, 107, 180, 0.1);
+  border: 1px solid rgba(0, 107, 180, 0.3);
+  border-radius: 4px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.export-note strong {
+  color: #006bb4;
+}
