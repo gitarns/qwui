@@ -1,5 +1,7 @@
 # qwui
 
+![qwui](qwui-1.png)
+
 A Kibana-like log explorer UI for [Quickwit](https://quickwit.io). React frontend, choice of Go or Rust backend.
 
 ## Architecture
