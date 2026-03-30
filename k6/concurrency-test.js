@@ -37,7 +37,7 @@ export const options = {
 };
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:9999';
-const INDEX_NAME = __ENV.INDEX_NAME || 'dcbprotect';
+const INDEX_NAME = __ENV.INDEX_NAME || 'demo';
 
 export default function () {
   concurrentRequests.add(1);
