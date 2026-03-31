@@ -50,6 +50,14 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
   const [currentField, setCurrentField] = useState('')
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
+
+  // Auto-resize textarea when query changes
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }, [query])
   const infoIconRef = useRef(null)
   const [tooltipStyle, setTooltipStyle] = useState({})
 
@@ -369,15 +377,15 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
               ▶
             </button>
           </div>
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
             value={query}
             onChange={handleQueryChange}
             onKeyDown={handleKeyDown}
             placeholder=""
             className="search-input"
             disabled={loading}
+            rows={1}
           />
           <div className="search-actions">
             {vrlEnabled && (

@@ -237,7 +237,7 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
 
     // Match field:value patterns, keeping quoted strings together
     // This regex handles: field:value, field:"quoted value", field:[complex]
-    const fieldValueRegex = /(\w+):([^\s]+(?:\s+"[^"]*")?|\[[^\]]*\]|"[^"]*"|\S+)/g
+    const fieldValueRegex = /(\w+):([^\s()]+(?:\s+"[^"]*")?|\[[^\]]*\]|"[^"]*")/g
 
     return query.replace(fieldValueRegex, (match, field, value) => {
       // Don't escape if value is already in quotes or is a wildcard

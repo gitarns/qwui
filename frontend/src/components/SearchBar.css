@@ -88,13 +88,17 @@
   background-color: var(--input-bg);
   color: var(--text-primary);
   transition: border-color 0.2s;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+  min-height: 2.1rem;
+  box-sizing: border-box;
 }
 
 .search-actions {
   position: absolute;
   right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0.35rem;
   display: flex;
   align-items: center;
   gap: 0.25rem;

@@ -1154,7 +1154,8 @@ function App() {
 
     // Match field:value patterns, keeping quoted strings together
     // This regex handles: field:value, field:"quoted value", field:[complex]
-    const fieldValueRegex = /(\w+):([^\s]+(?:\s+"[^"]*")?|\[[^\]]*\]|"[^"]*"|\S+)/g
+    // Parentheses are excluded from bare values so grouping like (field:val) is preserved
+    const fieldValueRegex = /(\w+):([^\s()]+(?:\s+"[^"]*")?|\[[^\]]*\]|"[^"]*")/g
 
     return query.replace(fieldValueRegex, (match, field, value) => {
       // Don't escape if value is already in quotes or is a wildcard
