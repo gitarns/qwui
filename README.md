@@ -248,6 +248,50 @@ Only numeric fields are accepted on the Y-axis — float fields are validated vi
 | `OIDC_REDIRECT` | — | OIDC redirect URL |
 | `SESSION_SECRET` | — | Cookie session secret |
 
+## Helm
+
+A Helm chart is available under [helm/qwui/](helm/qwui/).
+
+### Install
+
+```bash
+helm repo add qwui https://gitarns.github.io/qwui
+helm repo update
+helm install qwui qwui/qwui \
+  --set quickwit.url=http://quickwit:7280
+```
+
+### Use the Rust backend image
+
+```bash
+helm install qwui qwui/qwui \
+  --set image.repository=ghcr.io/gitarns/qwui-rust \
+  --set quickwit.url=http://quickwit:7280
+```
+
+### Enable ingress
+
+```bash
+helm install qwui qwui/qwui \
+  --set quickwit.url=http://quickwit:7280 \
+  --set ingress.enabled=true \
+  --set ingress.className=nginx \
+  --set "ingress.hosts[0].host=qwui.example.com" \
+  --set "ingress.hosts[0].paths[0].path=/" \
+  --set "ingress.hosts[0].paths[0].pathType=Prefix"
+```
+
+### Key values
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `image.repository` | `ghcr.io/gitarns/qwui-go` | Image to use (`qwui-go` or `qwui-rust`) |
+| `image.tag` | chart `appVersion` | Image tag |
+| `quickwit.url` | `http://quickwit:7280` | Quickwit base URL |
+| `replicaCount` | `1` | Number of replicas |
+| `ingress.enabled` | `false` | Enable ingress |
+| `extraEnv` | `[]` | Extra environment variables |
+
 ## Building for production
 
 ```bash
