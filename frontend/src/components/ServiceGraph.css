@@ -1,0 +1,164 @@
+.service-graph-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sg-canvas {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+/* Override ReactFlow background to use our CSS vars */
+.sg-canvas .react-flow__background {
+  background-color: var(--bg-primary);
+}
+
+.sg-canvas .react-flow__controls {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.sg-canvas .react-flow__controls-button {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 28px;
+  height: 28px;
+}
+
+.sg-canvas .react-flow__controls-button:hover {
+  background: var(--bg-primary);
+}
+
+.sg-canvas .react-flow__controls-button svg {
+  fill: var(--text-secondary);
+}
+
+.sg-canvas .react-flow__minimap {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.sg-canvas .react-flow__edge-label {
+  font-size: 10px;
+}
+
+/* ── Service Node ─────────────────────────────────────────────────────────── */
+.sg-node {
+  width: 210px;
+  background: var(--bg-secondary);
+  border: 2px solid #73BF69;
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.sg-node:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  transform: translateY(-1px);
+}
+
+.sg-node.selected {
+  box-shadow: 0 0 0 3px rgba(87, 148, 242, 0.5);
+}
+
+.sg-node-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary, var(--bg-secondary));
+}
+
+.sg-node-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sg-node-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.sg-node-metrics {
+  display: flex;
+  padding: 6px 0 4px;
+}
+
+.sg-metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 4px;
+  border-right: 1px solid var(--border-color);
+}
+
+.sg-metric:last-child {
+  border-right: none;
+}
+
+.sg-metric-label {
+  font-size: 0.67rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.sg-metric-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* ReactFlow handle dots */
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--bg-primary);
+}
+
+.sg-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.sg-footer {
+  padding: 4px 12px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Dark mode: ReactFlow attribution */
+.react-flow__attribution {
+  display: none;
+}

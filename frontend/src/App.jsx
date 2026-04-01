@@ -7,6 +7,7 @@ import ResultsTable from './components/ResultsTable'
 import TimeRangePicker from './components/TimeRangePicker'
 import Histogram from './components/Histogram'
 import GraphView from './components/GraphView'
+import TraceView from './components/TraceView'
 import SaveQueryModal from './components/SaveQueryModal'
 import LoadQueryModal from './components/LoadQueryModal'
 import ExportCSVModal from './components/ExportCSVModal'
@@ -55,7 +56,7 @@ function App() {
   const [editingFilter, setEditingFilter] = useState(null) // Track which filter is being edited
   const [editFilterData, setEditFilterData] = useState({ field: '', operator: 'is', value: '' })
   const [selectedColumns, setSelectedColumns] = useState([]) // Track selected field columns
-  const [viewMode, setViewMode] = useState('logs') // 'logs' or 'visualize'
+  const [viewMode, setViewMode] = useState('logs') // 'logs', 'visualize', or 'traces'
   const [numericFields, setNumericFields] = useState([]) // Track numeric fields for visualization
   const [showSettings, setShowSettings] = useState(false) // Track settings modal visibility
   const [userPreferences, setUserPreferences] = useState(() => {
@@ -1616,7 +1617,7 @@ function App() {
 
     // In visualize mode, skip the API calls but still update the state
     // GraphView watches these state changes and will fetch its own data
-    const skipAPICallsInVisualizeMode = viewMode === 'visualize' && !forceFetchDocs
+    const skipAPICallsInVisualizeMode = (viewMode === 'visualize' || viewMode === 'traces') && !forceFetchDocs
 
     // Cancel any ongoing search
     if (abortController) {
@@ -1660,7 +1661,7 @@ function App() {
       const queryWithFilters = buildQueryWithFilters(query, activeFilters)
 
       // When in visualize mode and fields are already discovered, don't fetch documents
-      const shouldFetchDocs = forceFetchDocs || viewMode === 'logs' || !fieldCache[selectedIndex] || fieldCache[selectedIndex].length === 0
+      const shouldFetchDocs = forceFetchDocs || (viewMode !== 'visualize' && viewMode !== 'traces') || !fieldCache[selectedIndex] || fieldCache[selectedIndex].length === 0
       const effectiveMaxHits = shouldFetchDocs ? maxHits : 0
 
       const searchBody = {
@@ -1701,7 +1702,7 @@ function App() {
       // In visualize mode, skip API calls and return early
       // GraphView will watch state changes and make its own API call
       if (skipAPICallsInVisualizeMode) {
-        console.log('Visualize mode: skipping API calls, currentQuery updated to:', query)
+        console.log('Visualize/Traces mode: skipping API calls, currentQuery updated to:', query)
         console.log('Time range:', activeTimeRange)
         console.log('Filters:', activeFilters)
         // Increment search trigger to force GraphView to re-fetch
@@ -2001,6 +2002,12 @@ function App() {
               className={`view-mode-btn ${viewMode === 'visualize' ? 'active' : ''}`}
             >
               Visualize
+            </button>
+            <button
+              onClick={() => setViewMode('traces')}
+              className={`view-mode-btn ${viewMode === 'traces' ? 'active' : ''}`}
+            >
+              Traces
             </button>
           </div>
         </div>
@@ -2385,7 +2392,7 @@ function App() {
             </div>
           )}
 
-          {viewMode === 'logs' ? (
+          {viewMode === 'logs' && (
             <ResultsTable
               results={searchResults}
               loading={loading}
@@ -2402,7 +2409,9 @@ function App() {
               userPreferences={userPreferences}
               darkMode={darkMode}
             />
-          ) : (
+          )}
+
+          {viewMode === 'visualize' && (
             <GraphView
               selectedIndex={selectedIndex}
               apiUrl={QUICKWIT_URL}
@@ -2419,6 +2428,18 @@ function App() {
                 setFirstEventTime(first)
                 setLastEventTime(last)
               }}
+            />
+          )}
+
+          {viewMode === 'traces' && (
+            <TraceView
+              selectedIndex={selectedIndex}
+              apiUrl={QUICKWIT_URL}
+              startTime={timeRange?.from ? timeRange.from * 1000 : null}
+              endTime={timeRange?.to ? timeRange.to * 1000 : null}
+              filters={filters}
+              query={currentQuery}
+              searchTrigger={searchTrigger}
             />
           )}
         </main>
