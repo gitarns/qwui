@@ -1,6 +1,8 @@
 # qwui
 
-![qwui](qwui-1.png)
+<a href="qwui-1.png"><img src="qwui-1.png" width="600"></a>
+<a href="qwui-2.png"><img src="qwui-2.png" width="600"></a>
+<a href="qwui-3.png"><img src="qwui-3.png" width="600"></a>
 
 A Kibana-like log explorer UI for [Quickwit](https://quickwit.io). React frontend, choice of Go or Rust backend.
 
