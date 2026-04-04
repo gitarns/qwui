@@ -185,11 +185,12 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
       return iso8601Regex.test(value)
     }
 
-    // Check if the value is a Unix timestamp (in seconds or milliseconds)
+    // Check if the value is a Unix timestamp (in seconds, milliseconds, or nanoseconds)
     if (typeof value === 'number') {
-      const isUnixSeconds = value > 946684800 && value < 4102444800 // 2000-2100 in seconds
-      const isUnixMillis = value > 946684800000 && value < 4102444800000 // 2000-2100 in milliseconds
-      return isUnixSeconds || isUnixMillis
+      const isUnixSeconds = value > 946684800 && value < 4102444800
+      const isUnixMillis  = value > 946684800000 && value < 4102444800000
+      const isUnixNanos   = value > 946684800000000000 && value < 4102444800000000000
+      return isUnixSeconds || isUnixMillis || isUnixNanos
     }
 
     return false
@@ -215,17 +216,22 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
       // Fallback for other string formats
       return value
     } else if (typeof value === 'number') {
-      // Parse Unix timestamp (detect if seconds or milliseconds)
-      const timestamp = value > 946684800000 ? value : value * 1000
-      const date = new Date(timestamp)
+      // Detect nanoseconds (values beyond year 2100 in milliseconds are nanoseconds)
+      let timestamp = value
+      if (value > 4102444800000) timestamp = Math.floor(value / 1_000_000)
+      else if (value <= 4102444800) timestamp = value * 1000
 
-      // Format with milliseconds if present
-      const baseFormat = format(date, "yyyy-MM-dd'T'HH:mm:ss")
-      if (timestamp % 1000 !== 0) {
-        const ms = String(date.getMilliseconds()).padStart(3, '0')
-        return `${baseFormat}.${ms}`
+      try {
+        const date = new Date(timestamp)
+        const baseFormat = format(date, "yyyy-MM-dd'T'HH:mm:ss")
+        if (timestamp % 1000 !== 0) {
+          const ms = String(date.getMilliseconds()).padStart(3, '0')
+          return `${baseFormat}.${ms}`
+        }
+        return baseFormat
+      } catch {
+        return String(value)
       }
-      return baseFormat
     }
 
     return String(value)

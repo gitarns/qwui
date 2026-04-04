@@ -136,6 +136,7 @@ async fn main() -> Result<()> {
 
     let client = ReqwestClient::builder()
         .timeout(Duration::from_secs(300))
+        .pool_max_idle_per_host(0)
         .build()?;
 
     // Test Quickwit connection

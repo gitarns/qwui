@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import Select, { components } from 'react-select'
+import { useState, useRef, useEffect } from 'react'
 import './FieldsSidebar.css'
 
 const POPULAR_MAX = 10
@@ -102,113 +101,118 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
   const firstSelectedId = selectedIndex.split(',').filter(Boolean)[0]
   const firstIndex = indexes.find(idx => idx.index_config.index_id === firstSelectedId)
   const firstTsField = firstIndex ? getTimestampField(firstIndex) : null
+  const selectedIds = selectedIndex.split(',').filter(Boolean)
 
-  // Prepare options for react-select, sorted alphabetically
-  const selectOptions = indexes
-    .map(idx => {
-      const tsField = getTimestampField(idx)
-      const incompatible = firstTsField !== null &&
-        idx.index_config.index_id !== firstSelectedId &&
-        tsField !== firstTsField
-      return {
-        value: idx.index_config.index_id,
-        label: idx.index_config.index_id,
-        isDefault: defaultIndex === idx.index_config.index_id,
-        isDisabled: incompatible,
-        disabledReason: incompatible ? `Timestamp field "${tsField || 'none'}" differs from "${firstTsField}"` : null
-      }
-    })
-    .sort((a, b) => a.label.localeCompare(b.label))
+  const sortedIndexes = [...indexes].sort((a, b) =>
+    a.index_config.index_id.localeCompare(b.index_config.index_id)
+  )
 
-  // Custom Option component with star button
-  const CustomOption = (props) => {
-    const { data } = props
-    return (
-      <components.Option {...props}>
-        <div className="select-option-content" title={data.disabledReason || ''}>
-          {!data.isDisabled && (
-            <button
-              className={`select-star-btn ${data.isDefault ? 'active' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                handleSetDefaultIndex(data.value)
-              }}
-              title={data.isDefault ? 'Remove as default' : 'Set as default'}
-            >
-              {data.isDefault ? '★' : '☆'}
-            </button>
-          )}
-          <span className="select-option-label" style={data.isDisabled ? { color: 'var(--text-muted)', fontStyle: 'italic' } : {}}>
-            {data.label}
-          </span>
-        </div>
-      </components.Option>
-    )
+  // Index dropdown state
+  const [indexDropdownOpen, setIndexDropdownOpen] = useState(false)
+  const [indexSearch, setIndexSearch] = useState('')
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    if (!indexDropdownOpen) return
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target))
+        setIndexDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [indexDropdownOpen])
+
+  const handleSelectOnly = (indexId) => {
+    onIndexChange({ target: { value: indexId } })
+    setIndexDropdownOpen(false)
+    setIndexSearch('')
   }
 
-  // Custom styles for react-select
-  const customStyles = {
-    control: (base, state) => ({
-      ...base,
-      backgroundColor: 'var(--input-bg)',
-      borderColor: state.isFocused ? '#667eea' : 'var(--input-border)',
-      boxShadow: state.isFocused ? '0 0 0 3px rgba(102, 126, 234, 0.1)' : 'none',
-      '&:hover': {
-        borderColor: state.isFocused ? '#667eea' : 'var(--input-border)'
-      }
-    }),
-    menu: (base) => ({
-      ...base,
-      backgroundColor: 'var(--bg-tertiary)',
-      border: '1px solid var(--border-color)',
-      zIndex: 100
-    }),
-    option: (base, state) => ({
-      ...base,
-      backgroundColor: state.isSelected
-        ? 'var(--input-bg)'
-        : state.isFocused
-          ? 'var(--bg-primary)'
-          : 'transparent',
-      color: 'var(--text-primary)',
-      cursor: 'pointer',
-      padding: 0
-    }),
-    multiValue: (base) => ({
-      ...base,
-      backgroundColor: 'var(--bg-primary)',
-      border: '1px solid var(--border-color)',
-      borderRadius: '3px',
-    }),
-    multiValueLabel: (base) => ({
-      ...base,
-      color: 'var(--text-primary)',
-      fontSize: '11px',
-      padding: '1px 4px',
-    }),
-    multiValueRemove: (base) => ({
-      ...base,
-      color: 'var(--text-muted)',
-      ':hover': { backgroundColor: 'var(--border-color)', color: 'var(--text-primary)' }
-    }),
+  const handleAddIndex = (e, indexId) => {
+    e.stopPropagation()
+    const next = selectedIds.includes(indexId)
+      ? selectedIds.filter(id => id !== indexId)
+      : [...selectedIds, indexId]
+    onIndexChange({ target: { value: next.join(',') } })
   }
+
+  const filteredIndexes = sortedIndexes.filter(idx =>
+    idx.index_config.index_id.toLowerCase().includes(indexSearch.toLowerCase())
+  )
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-index-selector">
+      <div className="sidebar-index-selector" ref={dropdownRef}>
         <label>Index</label>
-        <Select
-          isMulti
-          value={selectOptions.filter(opt => selectedIndex.split(',').filter(Boolean).includes(opt.value))}
-          options={selectOptions}
-          onChange={(options) => onIndexChange({ target: { value: (options || []).map(o => o.value).join(',') } })}
-          components={{ Option: CustomOption }}
-          styles={customStyles}
-          isSearchable={true}
-          placeholder="Search or select index..."
-          closeMenuOnSelect={false}
-        />
+        <div
+          className={`index-control ${indexDropdownOpen ? 'open' : ''}`}
+          onClick={() => setIndexDropdownOpen(v => !v)}
+        >
+          <span className="index-control-value">
+            {selectedIds.length === 0
+              ? <span className="index-placeholder">Select index…</span>
+              : selectedIds.map(id => (
+                <span key={id} className="index-chip">
+                  {id}
+                  <button
+                    className="index-chip-remove"
+                    onClick={e => { e.stopPropagation(); handleAddIndex(e, id) }}
+                    title="Remove"
+                  >×</button>
+                </span>
+              ))
+            }
+          </span>
+          <span className="index-control-arrow">{indexDropdownOpen ? '▴' : '▾'}</span>
+        </div>
+
+        {indexDropdownOpen && (
+          <div className="index-dropdown">
+            <input
+              className="index-search-input"
+              placeholder="Search indexes…"
+              value={indexSearch}
+              onChange={e => setIndexSearch(e.target.value)}
+              onClick={e => e.stopPropagation()}
+              autoFocus
+            />
+            <div className="index-dropdown-list">
+              {filteredIndexes.map(idx => {
+                const id = idx.index_config.index_id
+                const tsField = getTimestampField(idx)
+                const compatible = !firstTsField || !firstSelectedId || tsField === firstTsField || id === firstSelectedId
+                const isSelected = selectedIds.includes(id)
+                const isAdded = isSelected && selectedIds.length > 1 && id !== firstSelectedId
+                const isDefault = defaultIndex === id
+
+                return (
+                  <div
+                    key={id}
+                    className={`index-option ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleSelectOnly(id)}
+                  >
+                    <button
+                      className={`select-star-btn ${isDefault ? 'active' : ''}`}
+                      onClick={e => { e.stopPropagation(); handleSetDefaultIndex(id) }}
+                      title={isDefault ? 'Remove as default' : 'Set as default'}
+                    >
+                      {isDefault ? '★' : '☆'}
+                    </button>
+                    <span className="index-option-label">{id}</span>
+                    <button
+                      className={`index-add-btn ${isAdded ? 'added' : ''}`}
+                      onClick={e => handleAddIndex(e, id)}
+                      title={!compatible ? `Timestamp field "${tsField || 'none'}" differs from "${firstTsField}"` : isAdded ? 'Remove from selection' : 'Add to selection'}
+                      disabled={!compatible}
+                    >
+                      {isAdded ? '−' : '+'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="field-search">

@@ -55,5 +55,18 @@ services:
     command: python /scripts/generate.py
     restart: unless-stopped
 
+  trace-generator:
+    image: python:3.12-alpine
+    depends_on:
+      quickwit:
+        condition: service_healthy
+    volumes:
+      - ./dev:/scripts
+    environment:
+      - QUICKWIT_URL=http://quickwit:7280
+      - TRACE_RATE=3
+    command: python /scripts/generate-traces.py
+    restart: unless-stopped
+
 volumes:
   quickwit_data:
