@@ -355,7 +355,7 @@ export default function TraceView({
             />
           </div>
           <button type="submit" className="trace-search-btn" disabled={loading}>
-            {loading ? 'Searching…' : 'Search'}
+            {loading ? 'Searching…' : 'Filter'}
           </button>
         </div>
       </form>
