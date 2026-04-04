@@ -77,6 +77,14 @@ type CSVExportRequest struct {
 
 var config Config
 
+// httpClient disables keep-alives so each request gets a new TCP connection,
+// ensuring proper load-balancing across Kubernetes service endpoints.
+var httpClient = &http.Client{
+	Transport: &http.Transport{
+		DisableKeepAlives: true,
+	},
+}
+
 func main() {
 	// Load .env file if it exists
 	_ = godotenv.Load()
@@ -634,7 +642,7 @@ func fetchBatch(index, query string, offset, limit int, startTime, endTime *int6
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch from Quickwit: %w", err)
 	}
@@ -815,7 +823,7 @@ func fetchPatternBucket(index, query string, start, end int64) ([]map[string]int
 	}
 	body, _ := json.Marshal(req)
 	url := fmt.Sprintf("%s/api/v1/%s/search", config.QuickwitURL, index)
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	resp, err := httpClient.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
