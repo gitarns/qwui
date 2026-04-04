@@ -51,3 +51,15 @@ nodeSelector: {}
 extraEnv: []
 # - name: FOO
 #   value: bar
+# - name: BAR
+#   valueFrom:
+#     secretKeyRef:
+#       name: my-secret
+#       key: bar
+
+# Load all keys from a ConfigMap or Secret as environment variables
+extraEnvFrom: []
+# - secretRef:
+#     name: my-secret
+# - configMapRef:
+#     name: my-configmap
