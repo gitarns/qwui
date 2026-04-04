@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   qwui:
   - apiVersion: v2
+    appVersion: 1.0.3
+    created: "2026-04-04T10:41:12.538598256Z"
+    description: Quickwit UI — a lightweight frontend + backend for Quickwit search
+    digest: b7871a4b5e0830a2fee9fab3149a7d6fa1ce9599db2b318f95b4559e3a5baabd
+    name: qwui
+    type: application
+    urls:
+    - https://github.com/gitarns/qwui/releases/download/qwui-1.0.3/qwui-1.0.3.tgz
+    version: 1.0.3
+  - apiVersion: v2
     appVersion: 1.0.2
     created: "2026-04-04T05:33:38.987193736Z"
     description: Quickwit UI — a lightweight frontend + backend for Quickwit search
@@ -41,4 +51,4 @@ entries:
     urls:
     - https://github.com/gitarns/qwui/releases/download/qwui-1.0.0/qwui-1.0.0.tgz
     version: 1.0.0
-generated: "2026-04-04T05:33:38.987218282Z"
+generated: "2026-04-04T10:41:12.538626605Z"
