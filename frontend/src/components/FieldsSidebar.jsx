@@ -351,7 +351,20 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
             return (
               <div key={`popular-${field}`} className="field-item popular-field-item">
                 <div className={`field-header ${isExpanded ? 'expanded' : ''}`}>
-                  <div className="field-header-main" onClick={() => toggleField(field)} style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}>
+                  <div
+                    className="field-header-main"
+                    onClick={() => toggleField(field)}
+                    draggable={viewMode === 'visualize'}
+                    onDragStart={(e) => {
+                      if (viewMode !== 'visualize') {
+                        e.preventDefault()
+                        return
+                      }
+                      e.dataTransfer.setData('field', field)
+                      e.dataTransfer.setData(`field:${field}`, '')
+                    }}
+                    style={{ cursor: viewMode === 'visualize' ? 'grab' : 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}
+                  >
                     <span className="field-icon">t</span>
                     <span className="field-name" title={field}>{field}</span>
                   </div>
