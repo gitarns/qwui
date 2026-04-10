@@ -4,7 +4,8 @@
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 
 .sidebar-index-selector {
@@ -66,9 +67,9 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 1px 5px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  padding: 2px 6px;
+  background: rgba(102, 126, 234, 0.15);
+  border: 1px solid rgba(102, 126, 234, 0.4);
   border-radius: 3px;
   font-size: 0.75rem;
   line-height: 1.4;
@@ -76,6 +77,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #667eea;
+  font-weight: 500;
 }
 
 .index-chip-remove {
@@ -379,6 +382,10 @@
   background-color: var(--border-color-light);
 }
 
+.field-header[style*="cursor: pointer"]:hover {
+  background-color: rgba(102, 126, 234, 0.1);
+}
+
 .field-header.expanded {
   background-color: var(--bg-tertiary);
 }
@@ -398,13 +405,20 @@
 }
 
 .field-name {
-   flex: 0 1 auto;
+  flex: 0 1 auto;
   font-size: 0.875rem;
   color: var(--text-primary);
   font-family: 'Monaco', 'Courier New', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.field-no-stats {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin-left: 0.25rem;
+  opacity: 0.6;
 }
 
 .field-expand-indicator {
@@ -609,4 +623,180 @@
   height: 1px;
   background: var(--border-color, #e0e0e0);
   margin: 6px 0 4px;
+}
+
+/* View Values Button */
+.view-values-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.view-values-btn:hover {
+  background-color: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+/* Values Popover */
+.values-popover {
+  position: absolute;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 301;
+  width: 380px;
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.values-popover-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.values-popover-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.values-popover-close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.values-popover-close:hover {
+  color: var(--text-primary);
+}
+
+.values-popover-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.popover-bucket-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  margin-bottom: 0.3rem;
+  transition: background-color 0.15s;
+  gap: 0.5rem;
+}
+
+.popover-bucket-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.popover-bucket-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.popover-bucket-key {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.popover-bucket-count {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 45px;
+  text-align: right;
+}
+
+.popover-bucket-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.popover-filter-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.popover-filter-btn:hover {
+  background-color: var(--border-color);
+}
+
+.popover-include-btn {
+  color: #10b981;
+}
+
+.popover-include-btn:hover {
+  background-color: #d1fae5;
+  color: #059669;
+  border-color: #10b981;
+}
+
+.popover-exclude-btn {
+  color: #ef4444;
+}
+
+.popover-exclude-btn:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border-color: #ef4444;
 }

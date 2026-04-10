@@ -13,11 +13,13 @@ function savePopularity(data) {
 
 function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, selectedIndex, indexes, onIndexChange, selectedColumns = [], onToggleColumn, onSetDefaultIndex, viewMode }) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [expandedFields, setExpandedFields] = useState(new Set())
   const [popularity, setPopularity] = useState(loadPopularity)
   const [defaultIndex, setDefaultIndex] = useState(() => {
     return localStorage.getItem('defaultIndex') || null
   })
+  const [valueModalField, setValueModalField] = useState(null)
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
+  const fieldRefs = useRef({})
 
   // primary index (first in comma-joined list) used as key for popularity
   const primaryIndex = selectedIndex.split(',')[0] || selectedIndex
@@ -49,20 +51,6 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
     f.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const toggleField = async (field) => {
-    const newExpanded = new Set(expandedFields)
-    if (newExpanded.has(field)) {
-      newExpanded.delete(field)
-      setExpandedFields(newExpanded)
-    } else {
-      newExpanded.add(field)
-      setExpandedFields(newExpanded)
-      if (onFieldExpand && !aggregations?.[field]) {
-        await onFieldExpand(field)
-      }
-    }
-  }
-
   const getFieldAggregation = (fieldName) => {
     if (!aggregations) return null
     return aggregations[fieldName]
@@ -78,6 +66,45 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
     if (onFilterChange) {
       onFilterChange(fieldName, value, 'exclude')
     }
+  }
+
+  const handleFieldClick = (field, event) => {
+    const hasBuckets = aggregations?.[field]?.buckets?.length > 0
+    if (!hasBuckets) return
+
+    // Get the position of the clicked field
+    const fieldElement = event.currentTarget
+    const rect = fieldElement.getBoundingClientRect()
+    const sidebarRect = fieldElement.closest('.sidebar').getBoundingClientRect()
+
+    const POPOVER_WIDTH = 380
+    const POPOVER_HEIGHT = 300 // approximate max height
+    const GAP = 8
+    const PADDING = 10 // padding from viewport edge
+
+    let left = rect.right - sidebarRect.left + GAP
+    let top = rect.top - sidebarRect.top
+
+    // Check if popover would overflow on the right
+    const popoverRightEdge = sidebarRect.left + left + POPOVER_WIDTH
+    if (popoverRightEdge > window.innerWidth - PADDING) {
+      // Position to the left of the field instead
+      left = rect.left - sidebarRect.left - POPOVER_WIDTH - GAP
+    }
+
+    // Check if popover would overflow at the bottom
+    const popoverBottomEdge = rect.top + POPOVER_HEIGHT
+    if (popoverBottomEdge > window.innerHeight - PADDING) {
+      // Adjust top to keep it visible
+      top = window.innerHeight - PADDING - POPOVER_HEIGHT - sidebarRect.top
+    }
+
+    // Ensure positions are not negative
+    left = Math.max(0, left)
+    top = Math.max(0, top)
+
+    setPopoverPosition({ top, left })
+    setValueModalField(field)
   }
 
   const handleSetDefaultIndex = (indexId) => {
@@ -121,6 +148,19 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [indexDropdownOpen])
+
+  useEffect(() => {
+    if (!valueModalField) return
+    const handler = (e) => {
+      const popover = document.querySelector('.values-popover')
+      const sidebarFields = document.querySelector('.fields-list')
+      if (popover && !popover.contains(e.target) && sidebarFields && !sidebarFields.contains(e.target)) {
+        setValueModalField(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [valueModalField])
 
   const handleSelectOnly = (indexId) => {
     onIndexChange({ target: { value: indexId } })
@@ -251,13 +291,11 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
             {[...selectedColumns].sort((a, b) => a.localeCompare(b)).map(field => {
               const aggregation = getFieldAggregation(field)
               const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
-              const isExpanded = expandedFields.has(field)
               return (
                 <div key={field} className="field-item selected-field-item">
-                  <div className={`field-header ${isExpanded ? 'expanded' : ''}`}>
+                  <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: hasBuckets ? 'pointer' : 'default' }}>
                     <div
                       className="field-header-main"
-                      onClick={() => toggleField(field)}
                       draggable={viewMode === 'visualize'}
                       onDragStart={(e) => {
                         if (viewMode !== 'visualize') {
@@ -268,11 +306,13 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                         e.dataTransfer.setData(`field:${field}`, '')
                       }}
                       style={{ cursor: viewMode === 'visualize' ? 'grab' : 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}
+                      title={!hasBuckets ? 'No aggregation data available' : field}
                     >
                       <span className="field-icon">t</span>
                       <span className="field-name" title={field}>
                         {field}
                       </span>
+                      {!hasBuckets && <span className="field-no-stats" title="No aggregation data">∅</span>}
                     </div>
                     <button
                       className="add-column-btn selected"
@@ -285,45 +325,6 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                       −
                     </button>
                   </div>
-
-                  {hasBuckets && isExpanded && (
-                    <div className="field-buckets">
-                      {aggregation.buckets.map((bucket, idx) => {
-                        const displayKey = bucket.key_as_string || String(bucket.key)
-                        return (
-                          <div key={idx} className="bucket-item">
-                            <span className="bucket-key" title={displayKey}>
-                              {displayKey.substring(0, 25)}
-                              {displayKey.length > 25 ? '...' : ''}
-                            </span>
-                            <div className="bucket-actions">
-                              <span className="bucket-count">{bucket.doc_count.toLocaleString()}</span>
-                              <button
-                                className="filter-btn include-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleInclude(field, displayKey)
-                                }}
-                                title="Include this value"
-                              >
-                                ⊕
-                              </button>
-                              <button
-                                className="filter-btn exclude-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleExclude(field, displayKey)
-                                }}
-                                title="Exclude this value"
-                              >
-                                ⊖
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
                 </div>
               )
             })}
@@ -346,14 +347,12 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
           {filteredPopular.map(field => {
             const aggregation = aggregations?.[field]
             const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
-            const isExpanded = expandedFields.has(field)
             const isColumnSelected = selectedColumns.includes(field)
             return (
               <div key={`popular-${field}`} className="field-item popular-field-item">
-                <div className={`field-header ${isExpanded ? 'expanded' : ''}`}>
+                <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: hasBuckets ? 'pointer' : 'default' }}>
                   <div
                     className="field-header-main"
-                    onClick={() => toggleField(field)}
                     draggable={viewMode === 'visualize'}
                     onDragStart={(e) => {
                       if (viewMode !== 'visualize') {
@@ -367,6 +366,7 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                   >
                     <span className="field-icon">t</span>
                     <span className="field-name" title={field}>{field}</span>
+                    {!hasBuckets && <span className="field-no-stats" title="No aggregation data">∅</span>}
                   </div>
                   <button
                     className={`add-column-btn ${isColumnSelected ? 'selected' : ''}`}
@@ -376,34 +376,6 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                     {isColumnSelected ? '−' : '+'}
                   </button>
                 </div>
-                {hasBuckets && isExpanded && (
-                  <div className="field-buckets">
-                    {aggregation.buckets.map((bucket, idx) => {
-                      const displayKey = bucket.key_as_string || String(bucket.key)
-                      return (
-                        <div key={idx} className="bucket-item">
-                          <span className="bucket-key" title={displayKey}>
-                            {displayKey.substring(0, 25)}
-                            {displayKey.length > 25 ? '...' : ''}
-                          </span>
-                          <div className="bucket-actions">
-                            <span className="bucket-count">{bucket.doc_count.toLocaleString()}</span>
-                            <button
-                              className="filter-btn include-btn"
-                              onClick={(e) => { e.stopPropagation(); handleInclude(field, displayKey) }}
-                              title="Include this value"
-                            >⊕</button>
-                            <button
-                              className="filter-btn exclude-btn"
-                              onClick={(e) => { e.stopPropagation(); handleExclude(field, displayKey) }}
-                              title="Exclude this value"
-                            >⊖</button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
             )
           })}
@@ -420,15 +392,13 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
           filteredFields.map(field => {
             const aggregation = getFieldAggregation(field)
             const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
-            const isExpanded = expandedFields.has(field)
             const isColumnSelected = selectedColumns.includes(field)
 
             return (
               <div key={field} className="field-item">
-                <div className={`field-header ${isExpanded ? 'expanded' : ''}`}>
+                <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: hasBuckets ? 'pointer' : 'default' }}>
                   <div
                     className="field-header-main"
-                    onClick={() => toggleField(field)}
                     draggable={viewMode === 'visualize'}
                     onDragStart={(e) => {
                       if (viewMode !== 'visualize') {
@@ -444,6 +414,7 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                     <span className="field-name" title={field}>
                       {field}
                     </span>
+                    {!hasBuckets && <span className="field-no-stats" title="No aggregation data">∅</span>}
                   </div>
                   <button
                     className={`add-column-btn ${isColumnSelected ? 'selected' : ''}`}
@@ -456,50 +427,58 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                     {isColumnSelected ? '−' : '+'}
                   </button>
                 </div>
-
-                {hasBuckets && isExpanded && (
-                  <div className="field-buckets">
-                    {aggregation.buckets.map((bucket, idx) => {
-                      const displayKey = bucket.key_as_string || String(bucket.key)
-                      return (
-                        <div key={idx} className="bucket-item">
-                          <span className="bucket-key" title={displayKey}>
-                            {displayKey.substring(0, 25)}
-                            {displayKey.length > 25 ? '...' : ''}
-                          </span>
-                          <div className="bucket-actions">
-                            <span className="bucket-count">{bucket.doc_count.toLocaleString()}</span>
-                            <button
-                              className="filter-btn include-btn"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleInclude(field, displayKey)
-                              }}
-                              title="Include this value"
-                            >
-                              ⊕
-                            </button>
-                            <button
-                              className="filter-btn exclude-btn"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleExclude(field, displayKey)
-                              }}
-                              title="Exclude this value"
-                            >
-                              ⊖
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
             )
           })
         )}
       </div>
+
+      {/* Values Popover */}
+      {valueModalField && (
+        <div className="values-popover" style={{ top: `${popoverPosition.top}px`, left: `${popoverPosition.left}px` }}>
+          <div className="values-popover-header">
+            <h3>{valueModalField}</h3>
+            <button className="values-popover-close" onClick={() => setValueModalField(null)}>×</button>
+          </div>
+          <div className="values-popover-content">
+            {aggregations?.[valueModalField]?.buckets?.slice(0, 10).map((bucket, idx) => {
+              const displayKey = bucket.key_as_string || String(bucket.key)
+              return (
+                <div key={idx} className="popover-bucket-item">
+                  <div className="popover-bucket-info">
+                    <span className="popover-bucket-key" title={displayKey}>
+                      {displayKey}
+                    </span>
+                    <span className="popover-bucket-count">{bucket.doc_count.toLocaleString()}</span>
+                  </div>
+                  <div className="popover-bucket-actions">
+                    <button
+                      className="popover-filter-btn popover-include-btn"
+                      onClick={() => {
+                        handleInclude(valueModalField, displayKey)
+                        setValueModalField(null)
+                      }}
+                      title="Include this value"
+                    >
+                      ⊕
+                    </button>
+                    <button
+                      className="popover-filter-btn popover-exclude-btn"
+                      onClick={() => {
+                        handleExclude(valueModalField, displayKey)
+                        setValueModalField(null)
+                      }}
+                      title="Exclude this value"
+                    >
+                      ⊖
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

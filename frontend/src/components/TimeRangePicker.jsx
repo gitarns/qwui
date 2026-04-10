@@ -56,6 +56,9 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
   const [customQuickValue, setCustomQuickValue] = useState('15')
   const [customQuickUnit, setCustomQuickUnit] = useState('minutes')
 
+  const [fromDateInput, setFromDateInput] = useState('')
+  const [toDateInput, setToDateInput] = useState('')
+
   const quickSelectRef = useRef(null)
   const fromPopupRef = useRef(null)
   const toPopupRef = useRef(null)
@@ -329,6 +332,59 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     })
   }
 
+  const formatDateForInput = (date) => {
+    // Format: YYYY-MM-DD HH:mm:ss
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  }
+
+  const parseManualDate = (input) => {
+    // Accept formats: YYYY-MM-DD HH:mm:ss, YYYY-MM-DD HH:mm, or ISO formats
+    try {
+      const date = new Date(input)
+      if (isNaN(date.getTime())) {
+        return null
+      }
+      return date
+    } catch (e) {
+      return null
+    }
+  }
+
+  const handleFromDateInputChange = (value) => {
+    setFromDateInput(value)
+    const parsed = parseManualDate(value)
+    if (parsed) {
+      setFromDate(parsed)
+    }
+  }
+
+  const handleToDateInputChange = (value) => {
+    setToDateInput(value)
+    const parsed = parseManualDate(value)
+    if (parsed) {
+      setToDate(parsed)
+    }
+  }
+
+  // Update input fields only when tab changes to absolute
+  useEffect(() => {
+    if (fromTab === 'absolute') {
+      setFromDateInput(formatDateForInput(fromDate))
+    }
+  }, [fromTab])
+
+  useEffect(() => {
+    if (toTab === 'absolute') {
+      setToDateInput(formatDateForInput(toDate))
+    }
+  }, [toTab])
+
   return (
     <div className="time-range-picker">
       <div className="time-display">
@@ -460,6 +516,16 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
                   dateFormat="MMMM d, yyyy HH:mm:ss"
                   inline
                 />
+                <div className="manual-date-input-container">
+                  <label>Manual input:</label>
+                  <input
+                    type="text"
+                    value={fromDateInput}
+                    onChange={(e) => handleFromDateInputChange(e.target.value)}
+                    placeholder="YYYY-MM-DD HH:mm:ss"
+                    className="manual-date-input"
+                  />
+                </div>
               </div>
             )}
 
@@ -541,6 +607,16 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
                   dateFormat="MMMM d, yyyy HH:mm:ss"
                   inline
                 />
+                <div className="manual-date-input-container">
+                  <label>Manual input:</label>
+                  <input
+                    type="text"
+                    value={toDateInput}
+                    onChange={(e) => handleToDateInputChange(e.target.value)}
+                    placeholder="YYYY-MM-DD HH:mm:ss"
+                    className="manual-date-input"
+                  />
+                </div>
               </div>
             )}
 

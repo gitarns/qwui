@@ -1125,49 +1125,13 @@ function App() {
       value = String(value)
     }
 
-    // Escape each special character by prefixing with backslash
-    // Order matters: escape backslash first to avoid double-escaping
-    const escaped = value
-      .replace(/\\/g, '\\\\')    // \ -> \\
-      .replace(/\+/g, '\\+')     // + -> \+
-      .replace(/,/g, '\\,')      // , -> \,
-      .replace(/\^/g, '\\^')     // ^ -> \^
-      .replace(/`/g, '\\`')      // ` -> \`
-      .replace(/:/g, '\\:')      // : -> \:
-      .replace(/\{/g, '\\{')     // { -> \{
-      .replace(/\}/g, '\\}')     // } -> \}
-      .replace(/"/g, '\\"')      // " -> \"
-      .replace(/\[/g, '\\[')     // [ -> \[
-      .replace(/\]/g, '\\]')     // ] -> \]
-      .replace(/\(/g, '\\(')     // ( -> \(
-      .replace(/\)/g, '\\)')     // ) -> \)
-      .replace(/~/g, '\\~')      // ~ -> \~
-      .replace(/!/g, '\\!')      // ! -> \!
-      .replace(/-/g, '\\-')      // - -> \-
-      .replace(/ /g, '\\ ')      // (space) -> \(space)
-
-    return escaped
+    // No escaping - return value as-is
+    return value
   }
 
-  // Escape search query while preserving field:value syntax
+  // No escaping - return query as-is
   const escapeSearchQuery = (query) => {
-    if (!query || query === '*') return query
-
-    // Match field:value patterns, keeping quoted strings together
-    // This regex handles: field:value, field:"quoted value", field:[complex]
-    // Parentheses are excluded from bare values so grouping like (field:val) is preserved
-    const fieldValueRegex = /(\w+):([^\s()]+(?:\s+"[^"]*")?|\[[^\]]*\]|"[^"]*")/g
-
-    return query.replace(fieldValueRegex, (match, field, value) => {
-      // Don't escape if value is already in quotes or is a wildcard
-      if (value === '*' || value.startsWith('"')) {
-        return match
-      }
-
-      // Escape the value part only
-      const escapedValue = escapeQueryValue(value)
-      return `${field}:${escapedValue}`
-    })
+    return query
   }
 
   const buildQueryWithFilters = (baseQuery, filtersToUse = filtersRef.current) => {
@@ -1417,6 +1381,143 @@ function App() {
     // Pass the new time range directly to handleSearch
     // Use current search bar query to respect typed text
     executeSearch(100)
+  }
+
+  const fetchAllFieldAggregations = async (fieldsToFetch, queryToUse, filtersToUse, timeRangeToUse) => {
+    // Fetch aggregations for all fields in parallel
+    if (!selectedIndex || !fieldsToFetch || fieldsToFetch.length === 0) return
+
+    console.log('Fetching aggregations for fields:', fieldsToFetch.length, 'with', filtersToUse?.length || 0, 'filters')
+
+    try {
+      // Build query with filters
+      const queryWithFilters = buildQueryWithFilters(queryToUse, filtersToUse)
+
+      // Calculate batch size based on time range duration
+      let batchSize = 1
+      if (timeRangeToUse && timeRangeToUse.from !== null && timeRangeToUse.to !== null) {
+        const durationSeconds = timeRangeToUse.to - timeRangeToUse.from
+        const durationHours = durationSeconds / 3600
+        batchSize = Math.min(Math.max(1, Math.ceil(durationHours / 3)), MAX_BATCH_SIZE)
+      }
+
+      // Create time range slices
+      const timeSlices = []
+      if (batchSize > 1 && timeRangeToUse && timeRangeToUse.from !== null && timeRangeToUse.to !== null) {
+        const totalDuration = timeRangeToUse.to - timeRangeToUse.from
+        const sliceDuration = totalDuration / batchSize
+
+        for (let i = 0; i < batchSize; i++) {
+          const sliceStart = Math.floor(timeRangeToUse.from + (i * sliceDuration))
+          const sliceEnd = i === batchSize - 1 ? timeRangeToUse.to : Math.floor(timeRangeToUse.from + ((i + 1) * sliceDuration))
+          timeSlices.push({ start: sliceStart, end: sliceEnd })
+        }
+      } else {
+        timeSlices.push({
+          start: timeRangeToUse?.from || null,
+          end: timeRangeToUse?.to || null
+        })
+      }
+
+      // Create aggregation requests for all fields across all time slices
+      const allRequests = []
+      fieldsToFetch.forEach(fieldName => {
+        timeSlices.forEach(slice => {
+          const aggs = {
+            [fieldName]: {
+              terms: {
+                field: fieldName,
+                size: 10
+              }
+            }
+          }
+
+          const aggsBody = {
+            query: queryWithFilters || '*',
+            max_hits: 0,
+            aggs: aggs
+          }
+
+          if (slice.start !== null) {
+            aggsBody.start_timestamp = slice.start
+            if (slice.end !== null) {
+              aggsBody.end_timestamp = slice.end
+            }
+          }
+
+          allRequests.push(
+            fetch(`${QUICKWIT_URL}/quickwit/api/v1/${selectedIndex}/search`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept-Encoding': 'gzip, deflate',
+                'Access-Control-Allow-Origin': '*'
+              },
+              body: JSON.stringify(aggsBody)
+            })
+              .then(res => res.ok ? res.json() : null)
+              .catch(err => {
+                console.warn('Aggregation fetch failed for', fieldName, err)
+                return null
+              })
+              .then(data => ({ fieldName, data }))
+          )
+        })
+      })
+
+      // Execute all requests in parallel
+      const results = await Promise.all(allRequests)
+
+      // Merge results by field
+      const mergedAggregations = {}
+      const failedFields = new Set()
+
+      results.forEach(({ fieldName, data }) => {
+        if (!data || !data.aggregations || !data.aggregations[fieldName]) {
+          failedFields.add(fieldName)
+          return
+        }
+
+        if (!mergedAggregations[fieldName]) {
+          mergedAggregations[fieldName] = { buckets: {} }
+        }
+
+        // Merge buckets from this time slice
+        const buckets = data.aggregations[fieldName].buckets || []
+
+        // If no buckets returned, mark as failed
+        if (buckets.length === 0) {
+          failedFields.add(fieldName)
+          return
+        }
+
+        buckets.forEach(bucket => {
+          const key = bucket.key_as_string || String(bucket.key)
+          if (mergedAggregations[fieldName].buckets[key]) {
+            mergedAggregations[fieldName].buckets[key].doc_count += bucket.doc_count
+          } else {
+            mergedAggregations[fieldName].buckets[key] = { ...bucket, key: bucket.key }
+          }
+        })
+      })
+
+      // Log fields that failed to get aggregations
+      if (failedFields.size > 0) {
+        console.info('Fields without aggregation data:', Array.from(failedFields))
+      }
+
+      // Convert merged buckets to arrays and sort
+      const finalAggregations = {}
+      Object.entries(mergedAggregations).forEach(([fieldName, data]) => {
+        const bucketArray = Object.values(data.buckets).sort((a, b) => b.doc_count - a.doc_count)
+        finalAggregations[fieldName] = { buckets: bucketArray }
+      })
+
+      // Update state with all aggregations
+      setFieldAggregations(finalAggregations)
+    } catch (err) {
+      console.warn('Failed to fetch all field aggregations:', err)
+    }
   }
 
   const fetchFieldAggregation = async (fieldName) => {
@@ -1860,7 +1961,11 @@ function App() {
 
       setNumericFields(Array.from(numericFieldsFromMapping))
 
-
+      // Fetch aggregations for all discovered fields (only for initial search, not pagination)
+      if (!appendResults && discoveredFields && discoveredFields.length > 0) {
+        // Fire aggregations fetch in background (don't await it)
+        fetchAllFieldAggregations(discoveredFields, query, activeFilters, activeTimeRange)
+      }
 
       // Calculate total request time (only for initial search, not when loading more)
       if (!appendResults) {

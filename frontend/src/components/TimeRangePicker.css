@@ -441,3 +441,39 @@
 .apply-btn:active {
   transform: translateY(1px);
 }
+
+/* Manual Date Input */
+.manual-date-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.manual-date-input-container label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.manual-date-input {
+  padding: 0.5rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.manual-date-input:focus {
+  outline: none;
+  border-color: #006bb4;
+  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+}
