@@ -69,8 +69,16 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
   }
 
   const handleFieldClick = (field, event) => {
+    event.stopPropagation()
+
     const hasBuckets = aggregations?.[field]?.buckets?.length > 0
     if (!hasBuckets) return
+
+    // If clicking the same field that has the popover open, close it
+    if (valueModalField === field) {
+      setValueModalField(null)
+      return
+    }
 
     // Get the position of the clicked field
     const fieldElement = event.currentTarget
@@ -153,8 +161,15 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
     if (!valueModalField) return
     const handler = (e) => {
       const popover = document.querySelector('.values-popover')
-      const sidebarFields = document.querySelector('.fields-list')
-      if (popover && !popover.contains(e.target) && sidebarFields && !sidebarFields.contains(e.target)) {
+
+      // Don't close if clicking on a field header or inside the popover
+      if (e.target.closest('.field-header') || (popover && popover.contains(e.target))) {
+        return
+      }
+
+      // Close if clicking outside the sidebar entirely
+      const sidebar = document.querySelector('.sidebar')
+      if (sidebar && !sidebar.contains(e.target)) {
         setValueModalField(null)
       }
     }
