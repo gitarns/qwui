@@ -30,10 +30,11 @@ use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
     services::ServeDir,
-    trace::TraceLayer,
+    trace::{TraceLayer, DefaultMakeSpan, DefaultOnResponse},
+    LatencyUnit,
 };
 use tower_sessions::{Expiry, MemoryStore, Session, SessionManagerLayer};
-use tracing::{error, info};
+use tracing::{error, info, Level};
 use vrl::compiler::{state::RuntimeState, Context, TimeZone};
 
 #[derive(Clone)]
@@ -124,15 +125,39 @@ async fn cache_control_middleware(req: Request, next: Next) -> Response {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
+
+    // Parse LOG_LEVEL env var (default to info)
+    let log_level_str = env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+    let log_level = match log_level_str.to_lowercase().as_str() {
+        "trace" => Level::TRACE,
+        "debug" => Level::DEBUG,
+        "info" => Level::INFO,
+        "warn" => Level::WARN,
+        "error" => Level::ERROR,
+        _ => {
+            eprintln!("Invalid LOG_LEVEL '{}', using 'info'", log_level_str);
+            Level::INFO
+        }
+    };
+
+    // Minimal logging setup (we output JSON directly to stdout)
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(log_level)
         .with_target(false)
+        .with_thread_ids(false)
+        .with_thread_names(false)
+        .with_file(false)
+        .with_line_number(false)
+        .with_level(false)
+        .without_time()
+        .with_ansi(false)
         .init();
 
     let config = Config::from_env();
-    info!("Starting server on port {}", config.port);
-    info!("Quickwit URL: {}", config.quickwit_url);
-    info!("OIDC Enabled: {}", config.oidc_enabled);
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+    println!("{}", serde_json::json!({"type": "startup", "timestamp": now, "message": "Starting server", "port": config.port}));
+    println!("{}", serde_json::json!({"type": "startup", "timestamp": now, "message": "Quickwit URL", "url": config.quickwit_url}));
+    println!("{}", serde_json::json!({"type": "startup", "timestamp": now, "message": "OIDC Enabled", "value": config.oidc_enabled}));
 
     let client = ReqwestClient::builder()
         .timeout(Duration::from_secs(300))
@@ -143,7 +168,8 @@ async fn main() -> Result<()> {
     let health_url = format!("{}/api/v1/version", config.quickwit_url);
     match client.get(&health_url).send().await {
         Ok(resp) if resp.status().is_success() => {
-            info!("✓ Successfully connected to Quickwit");
+            let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+            println!("{}", serde_json::json!({"type": "startup", "timestamp": now, "message": "Successfully connected to Quickwit"}));
         }
         Ok(resp) => {
             anyhow::bail!(
@@ -243,6 +269,7 @@ async fn main() -> Result<()> {
         .nest(
             "/quickwit",
             protected_reverse_proxy
+                .layer(middleware::from_fn(log_quickwit_query))
                 .layer(middleware::from_fn(smart_proxy_middleware))
                 .layer(ServiceBuilder::new().layer(middleware::from_fn_with_state(
                     state.clone(),
@@ -254,10 +281,23 @@ async fn main() -> Result<()> {
         .layer(middleware::from_fn(cache_control_middleware))
         .layer(session_layer)
         .layer(cors)
-        .layer(TraceLayer::new_for_http());
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(
+                    DefaultMakeSpan::new()
+                        .level(Level::DEBUG)
+                        .include_headers(false),
+                )
+                .on_response(
+                    DefaultOnResponse::new()
+                        .level(Level::DEBUG)
+                        .latency_unit(LatencyUnit::Millis),
+                ),
+        );
 
     let addr: SocketAddr = format!("0.0.0.0:{}", config.port).parse()?;
-    info!("Listening on {}", addr);
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+    println!("{}", serde_json::json!({"type": "startup", "timestamp": now, "message": "Listening on", "address": addr.to_string()}));
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
@@ -431,7 +471,7 @@ async fn user_info(session: Session) -> impl IntoResponse {
 async fn auth_middleware(
     State(state): State<AppState>,
     session: Session,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Response {
     if !state.config.oidc_enabled {
@@ -439,7 +479,9 @@ async fn auth_middleware(
     }
 
     let user: Option<User> = session.get("user").await.unwrap();
-    if user.is_some() {
+    if let Some(ref u) = user {
+        // Store username in request extensions for logging
+        request.extensions_mut().insert(u.email.clone());
         next.run(request).await
     } else {
         (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
@@ -602,15 +644,63 @@ async fn fetch_batch(
         end_timestamp: end_ts,
     };
 
-    info!("Fetching batch to {} with {:?}", url, req_body);
-    let resp = client.post(&url).json(&req_body).send().await?;
+    let start_time = std::time::Instant::now();
+
+    let resp = match client.post(&url).json(&req_body).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            let duration_ms = start_time.elapsed().as_millis();
+            let log_json = serde_json::json!({
+                "type": "quickwit_query",
+                "timestamp": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+                "duration_ms": duration_ms,
+                "status_code": "error",
+                "index": index,
+                "query": query,
+                "offset": offset,
+                "limit": limit,
+                "error": e.to_string(),
+            });
+            println!("{}", log_json);
+            return Err(e.into());
+        }
+    };
+
+    let status_code = resp.status().as_u16();
+    let duration_ms = start_time.elapsed().as_millis();
 
     if !resp.status().is_success() {
-        anyhow::bail!("Quickwit returned status {}", resp.status());
+        let error_text = resp.text().await.unwrap_or_else(|_| "unknown error".to_string());
+        let log_json = serde_json::json!({
+            "type": "quickwit_query",
+            "timestamp": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+            "duration_ms": duration_ms,
+            "status_code": status_code,
+            "index": index,
+            "query": query,
+            "offset": offset,
+            "limit": limit,
+            "error": error_text,
+        });
+        println!("{}", log_json);
+        anyhow::bail!("Quickwit returned status {}", status_code);
     }
 
     let search_resp: QuickwitSearchResponse = resp.json().await?;
-    info!("Fetched batch with {} hits", search_resp.num_hits);
+
+    let log_json = serde_json::json!({
+        "type": "quickwit_query",
+        "timestamp": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+        "duration_ms": duration_ms,
+        "status_code": status_code,
+        "index": index,
+        "query": query,
+        "offset": offset,
+        "limit": limit,
+        "num_hits": search_resp.num_hits,
+    });
+    println!("{}", log_json);
+
     Ok(search_resp.hits)
 }
 
@@ -844,6 +934,57 @@ fn format_value(v: &serde_json::Value) -> String {
         serde_json::Value::Bool(b) => b.to_string(),
         _ => v.to_string(),
     }
+}
+
+// Middleware to log Quickwit search query responses (timing + status + username)
+async fn log_quickwit_query(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+    let start_time = std::time::Instant::now();
+
+    // Extract username from request extensions (set by auth_middleware)
+    let username = req.extensions().get::<String>().cloned();
+
+    // Extract query from request body for logging
+    let mut query_string: Option<String> = None;
+    if method == Method::POST && uri.path().contains("/api/v1/") && uri.path().contains("/search") {
+        let body = std::mem::take(req.body_mut());
+        if let Ok(body_bytes) = to_bytes(body, usize::MAX).await {
+            if let Ok(body_json) = serde_json::from_slice::<Value>(&body_bytes) {
+                if let Some(query) = body_json.get("query").and_then(|q| q.as_str()) {
+                    query_string = Some(query.to_string());
+                }
+            }
+            // Put body back
+            *req.body_mut() = Body::from(body_bytes);
+        }
+    }
+
+    // Call the next middleware
+    let response = next.run(req).await;
+    let duration_ms = start_time.elapsed().as_millis();
+
+    // Log response for search queries only (not the request)
+    if method == Method::POST && uri.path().contains("/api/v1/") && uri.path().contains("/search") {
+        let status = response.status();
+        if let Some(query) = query_string {
+            let user_field = username.as_deref().unwrap_or("anonymous");
+
+            let log_json = serde_json::json!({
+                "type": "quickwit_query",
+                "timestamp": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+                "duration_ms": duration_ms,
+                "status_code": status.as_u16(),
+                "path": uri.path(),
+                "username": user_field,
+                "query": query,
+            });
+
+            println!("{}", log_json);
+        }
+    }
+
+    Ok(response)
 }
 
 async fn smart_proxy_middleware(mut req: Request, next: Next) -> Result<Response, StatusCode> {

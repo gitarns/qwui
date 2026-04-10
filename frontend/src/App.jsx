@@ -1424,85 +1424,95 @@ function App() {
         })
       }
 
-      // Create aggregation requests for all fields across all time slices
+      // OPTIMIZATION: Create a single aggregation request for all fields per time slice
+      // instead of separate requests per field per slice.
+      // This reduces requests from (fields × slices) to just (slices).
+      // E.g., 10 fields × 20 time slices = 200 requests → 20 requests
       const allRequests = []
-      fieldsToFetch.forEach(fieldName => {
-        timeSlices.forEach(slice => {
-          const aggs = {
-            [fieldName]: {
-              terms: {
-                field: fieldName,
-                size: 10
-              }
+      timeSlices.forEach((slice, sliceIndex) => {
+        // Combine all fields into a single aggregation query
+        const aggs = {}
+        fieldsToFetch.forEach(fieldName => {
+          aggs[fieldName] = {
+            terms: {
+              field: fieldName,
+              size: 10
             }
           }
-
-          const aggsBody = {
-            query: queryWithFilters || '*',
-            max_hits: 0,
-            aggs: aggs
-          }
-
-          if (slice.start !== null) {
-            aggsBody.start_timestamp = slice.start
-            if (slice.end !== null) {
-              aggsBody.end_timestamp = slice.end
-            }
-          }
-
-          allRequests.push(
-            fetch(`${QUICKWIT_URL}/quickwit/api/v1/${selectedIndex}/search`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept-Encoding': 'gzip, deflate',
-                'Access-Control-Allow-Origin': '*'
-              },
-              body: JSON.stringify(aggsBody)
-            })
-              .then(res => res.ok ? res.json() : null)
-              .catch(err => {
-                console.warn('Aggregation fetch failed for', fieldName, err)
-                return null
-              })
-              .then(data => ({ fieldName, data }))
-          )
         })
+
+        const aggsBody = {
+          query: queryWithFilters || '*',
+          max_hits: 0,
+          aggs: aggs
+        }
+
+        if (slice.start !== null) {
+          aggsBody.start_timestamp = slice.start
+          if (slice.end !== null) {
+            aggsBody.end_timestamp = slice.end
+          }
+        }
+
+        allRequests.push(
+          fetch(`${QUICKWIT_URL}/quickwit/api/v1/${selectedIndex}/search`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept-Encoding': 'gzip, deflate',
+              'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify(aggsBody)
+          })
+            .then(res => res.ok ? res.json() : null)
+            .catch(err => {
+              console.warn('Aggregation fetch failed for time slice', sliceIndex, err)
+              return null
+            })
+            .then(data => ({ sliceIndex, data }))
+        )
       })
 
       // Execute all requests in parallel
       const results = await Promise.all(allRequests)
 
-      // Merge results by field
+      // Merge results from all time slices by field
       const mergedAggregations = {}
       const failedFields = new Set()
 
-      results.forEach(({ fieldName, data }) => {
-        if (!data || !data.aggregations || !data.aggregations[fieldName]) {
-          failedFields.add(fieldName)
+      // Initialize aggregation objects for all fields
+      fieldsToFetch.forEach(fieldName => {
+        mergedAggregations[fieldName] = { buckets: {} }
+      })
+
+      results.forEach(({ sliceIndex, data }) => {
+        if (!data || !data.aggregations) {
           return
         }
 
-        if (!mergedAggregations[fieldName]) {
-          mergedAggregations[fieldName] = { buckets: {} }
-        }
-
-        // Merge buckets from this time slice
-        const buckets = data.aggregations[fieldName].buckets || []
-
-        // If no buckets returned, mark as failed
-        if (buckets.length === 0) {
-          failedFields.add(fieldName)
-          return
-        }
-
-        buckets.forEach(bucket => {
-          const key = bucket.key_as_string || String(bucket.key)
-          if (mergedAggregations[fieldName].buckets[key]) {
-            mergedAggregations[fieldName].buckets[key].doc_count += bucket.doc_count
-          } else {
-            mergedAggregations[fieldName].buckets[key] = { ...bucket, key: bucket.key }
+        // Process each field in the aggregations response
+        fieldsToFetch.forEach(fieldName => {
+          if (!data.aggregations[fieldName]) {
+            failedFields.add(fieldName)
+            return
           }
+
+          // Merge buckets from this time slice
+          const buckets = data.aggregations[fieldName].buckets || []
+
+          // If no buckets returned, mark as failed
+          if (buckets.length === 0 && sliceIndex === 0) {
+            failedFields.add(fieldName)
+          }
+
+          buckets.forEach(bucket => {
+            const key = bucket.key_as_string || String(bucket.key)
+            if (mergedAggregations[fieldName].buckets[key]) {
+              mergedAggregations[fieldName].buckets[key].doc_count += bucket.doc_count
+            } else {
+              mergedAggregations[fieldName].buckets[key] = { ...bucket, key: bucket.key }
+            }
+          })
         })
       })
 
@@ -1513,13 +1523,21 @@ function App() {
 
       // Convert merged buckets to arrays and sort
       const finalAggregations = {}
+      let hasAnyData = false
       Object.entries(mergedAggregations).forEach(([fieldName, data]) => {
         const bucketArray = Object.values(data.buckets).sort((a, b) => b.doc_count - a.doc_count)
+        if (bucketArray.length > 0) {
+          hasAnyData = true
+        }
         finalAggregations[fieldName] = { buckets: bucketArray }
       })
 
-      // Update state with all aggregations
-      setFieldAggregations(finalAggregations)
+      // Only update state if we got some successful data (don't invalidate previous data on error)
+      if (hasAnyData) {
+        setFieldAggregations(finalAggregations)
+      } else {
+        console.warn('No aggregation data received, keeping previous field values')
+      }
     } catch (err) {
       console.warn('Failed to fetch all field aggregations:', err)
     }
@@ -1631,15 +1649,20 @@ function App() {
       // Convert merged buckets back to array and sort by doc_count
       const finalBuckets = Object.values(mergedBuckets).sort((a, b) => b.doc_count - a.doc_count)
 
-      // Update field aggregations with merged result
-      setFieldAggregations(prev => ({
-        ...prev,
-        [fieldName]: {
-          buckets: finalBuckets
-        }
-      }))
+      // Only update if we got data (don't invalidate previous data on error)
+      if (finalBuckets.length > 0) {
+        setFieldAggregations(prev => ({
+          ...prev,
+          [fieldName]: {
+            buckets: finalBuckets
+          }
+        }))
+      } else {
+        console.warn(`No aggregation data for field ${fieldName}, keeping previous values`)
+      }
     } catch (err) {
-      // Aggregation fetch failed
+      // Aggregation fetch failed - keep previous data
+      console.warn(`Failed to fetch aggregation for field ${fieldName}:`, err)
     }
   }
 

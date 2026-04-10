@@ -49,6 +49,29 @@ type Config struct {
 	Origin        string
 }
 
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+	written    bool
+}
+
+func (w *responseWriter) WriteHeader(code int) {
+	if !w.written {
+		w.statusCode = code
+		w.written = true
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *responseWriter) Write(b []byte) (int, error) {
+	if !w.written {
+		w.statusCode = http.StatusOK
+		w.written = true
+	}
+	return w.ResponseWriter.Write(b)
+}
+
 type QuickwitSearchRequest struct {
 	Query          string                 `json:"query"`
 	MaxHits        int                    `json:"max_hits"`
@@ -108,11 +131,25 @@ func main() {
 		log.Warn().Str("level", config.LogLevel).Msg("Invalid log level, using info")
 		lv = zerolog.InfoLevel
 	}
+
+	// Configure zerolog to output ONLY JSON (no timestamp, level prefix, etc.)
+	log.Logger = log.Output(os.Stdout)
 	zerolog.SetGlobalLevel(lv)
 
-	log.Info().Msgf("Starting server on port %s", config.Port)
-	log.Info().Msgf("Quickwit URL: %s", config.QuickwitURL)
-	log.Info().Msgf("OIDC Enabled: %v", config.OIDCEnabled)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if b, err := json.Marshal(map[string]interface{}{"type": "startup", "timestamp": now, "message": "Logging configured", "log_level": lv.String()}); err == nil {
+		fmt.Println(string(b))
+	}
+
+	if b, err := json.Marshal(map[string]interface{}{"type": "startup", "timestamp": now, "message": "Starting server", "port": config.Port}); err == nil {
+		fmt.Println(string(b))
+	}
+	if b, err := json.Marshal(map[string]interface{}{"type": "startup", "timestamp": now, "message": "Quickwit URL", "url": config.QuickwitURL}); err == nil {
+		fmt.Println(string(b))
+	}
+	if b, err := json.Marshal(map[string]interface{}{"type": "startup", "timestamp": now, "message": "OIDC Enabled", "value": config.OIDCEnabled}); err == nil {
+		fmt.Println(string(b))
+	}
 
 	// Parse Quickwit URL for reverse proxy
 	quickwitURL, err := url.Parse(config.QuickwitURL)
@@ -124,11 +161,28 @@ func main() {
 	if err := testQuickwitConnection(); err != nil {
 		log.Fatal().Err(err).Msg("Cannot connect to Quickwit")
 	} else {
-		log.Info().Msg("✓ Successfully connected to Quickwit")
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		if b, err := json.Marshal(map[string]interface{}{"type": "startup", "timestamp": now, "message": "Successfully connected to Quickwit"}); err == nil {
+			fmt.Println(string(b))
+		}
 	}
 
-	// Initialize Gin
-	r := gin.Default()
+	// Initialize Gin without default logger
+	r := gin.New()
+	// Add custom logger that only logs at debug level
+	r.Use(func(c *gin.Context) {
+		startTime := time.Now()
+		c.Next()
+		duration := time.Since(startTime)
+
+		// Only log HTTP requests at debug level
+		log.Debug().
+			Str("method", c.Request.Method).
+			Str("path", c.Request.URL.Path).
+			Int("status", c.Writer.Status()).
+			Int64("duration_ms", duration.Milliseconds()).
+			Msg("HTTP request")
+	})
 	r.Use(CORSMiddleware(config.Origin))
 
 	// Setup Session Store
@@ -165,16 +219,37 @@ func main() {
 	api := r.Group("/api")
 	api.Use(CORSMiddleware(config.Origin))
 
-	// Proxy handler
+	// Proxy handler with timing and structured logging
 	proxy := httputil.NewSingleHostReverseProxy(quickwitURL)
+
 	proxyHandler := func(c *gin.Context) {
+		startTime := time.Now()
+		originalPath := c.Request.URL.Path
 		c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/quickwit")
+
+		// Extract username from session
+		username := "anonymous"
+		session := sessions.Default(c)
+		if userEmail, ok := session.Get("email").(string); ok && userEmail != "" {
+			username = userEmail
+		}
+
+		var request QuickwitSearchRequest
+		var requestParsed bool
+		var queryIndex string
+
+		// Extract index from path (format: /api/v1/{index}/search)
+		pathParts := strings.Split(strings.TrimPrefix(c.Request.URL.Path, "/api/v1/"), "/")
+		if len(pathParts) > 0 {
+			queryIndex = pathParts[0]
+		}
+
 		if c.Request.Body != nil {
 			bodyBytes, err := io.ReadAll(c.Request.Body)
 			if err == nil {
-				var request QuickwitSearchRequest
 				unmarshalErr := json.Unmarshal(bodyBytes, &request)
 				if unmarshalErr == nil {
+					requestParsed = true
 					parts := splitQueryByPipe(request.Query)
 					if len(parts) > 1 {
 						request.Query = parts[0]
@@ -188,19 +263,51 @@ func main() {
 						} else {
 							log.Error().Err(marshalErr).Msg("Failed to re-marshal QuickwitSearchRequest")
 						}
-
 					}
-					log.Info().Interface("request", request).Msg("Proxying request")
 				} else {
-					log.Debug().Err(unmarshalErr).Msg("Could not unmarshal request body to QuickwitSearchRequest, proxying as is")
+					log.Debug().Err(unmarshalErr).Msg("Could not unmarshal request body to QuickwitSearchRequest")
 				}
-
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			} else {
 				log.Error().Err(err).Msg("Failed to read request body for proxy")
 			}
 		}
-		proxy.ServeHTTP(c.Writer, c.Request)
+
+		// Wrap response writer to capture status and errors
+		wrappedWriter := &responseWriter{ResponseWriter: c.Writer, statusCode: http.StatusOK}
+
+		// Call the proxy
+		proxy.ServeHTTP(wrappedWriter, c.Request)
+
+		// Log query with timing in JSON format
+		duration := time.Since(startTime)
+		logEntry := map[string]interface{}{
+			"type":           "quickwit_query",
+			"timestamp":      startTime.Format(time.RFC3339Nano),
+			"duration_ms":    duration.Milliseconds(),
+			"status_code":    wrappedWriter.statusCode,
+			"username":       username,
+			"path":           originalPath,
+			"method":         c.Request.Method,
+		}
+
+		if queryIndex != "" {
+			logEntry["index"] = queryIndex
+		}
+
+		if requestParsed {
+			logEntry["query"] = request.Query
+			logEntry["max_hits"] = request.MaxHits
+		}
+
+		// Determine log level based on status code
+		logEvent := log.Info()
+		if wrappedWriter.statusCode >= 400 {
+			logEvent = log.Error()
+			logEntry["error"] = true
+		}
+
+		logEvent.Interface("query_log", logEntry).Send()
 	}
 
 	rproxy := r.Group("/quickwit")
