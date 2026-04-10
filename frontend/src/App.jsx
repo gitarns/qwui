@@ -1125,8 +1125,13 @@ function App() {
       value = String(value)
     }
 
-    // No escaping - return value as-is
-    return value
+    // Escape quotes and double quotes only
+    const escaped = value
+      .replace(/\\/g, '\\\\')    // \ -> \\
+      .replace(/"/g, '\\"')      // " -> \"
+      .replace(/'/g, "\\'")      // ' -> \'
+
+    return escaped
   }
 
   // No escaping - return query as-is
@@ -1884,7 +1889,21 @@ function App() {
       ])
 
       if (!response.ok) {
-        throw new Error(`Search failed: ${response.statusText}`)
+        let errorMessage = `Search failed: ${response.statusText}`
+        try {
+          const errorData = await response.json()
+          // Try to extract error message from Quickwit response
+          if (errorData.message) {
+            errorMessage = errorData.message
+          } else if (errorData.error) {
+            errorMessage = errorData.error
+          } else if (typeof errorData === 'string') {
+            errorMessage = errorData
+          }
+        } catch (e) {
+          // If response is not JSON, just use status text
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
