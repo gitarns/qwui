@@ -76,6 +76,12 @@
   text-align: left;
 }
 
+.header-time {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .dark-mode .results-list-header {
   background-color: #1f1f1f;
   border-bottom-color: #555555;
@@ -122,6 +128,29 @@
 }
 
 .sort-column-btn:hover {
+  background-color: #006bb4;
+  color: white;
+  opacity: 1;
+}
+
+.sort-order-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 4px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+
+.sort-order-btn:hover {
   background-color: #006bb4;
   color: white;
   opacity: 1;

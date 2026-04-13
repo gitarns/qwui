@@ -33,7 +33,7 @@ function highlightText(text, terms) {
   )
 }
 
-function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreResults = false, loadingMore = false, onLoadMore, requestTime = null, selectedColumns = [], onRemoveColumn, onFilterChange, onToggleColumn, userPreferences, darkMode = false, searchQuery = '' }) {
+function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreResults = false, loadingMore = false, onLoadMore, requestTime = null, selectedColumns = [], onRemoveColumn, onFilterChange, onToggleColumn, userPreferences, darkMode = false, searchQuery = '', sortOrder = 'newest', onSortOrderChange }) {
   const [expandedRows, setExpandedRows] = useState(new Set())
   const [sortBy, setSortBy] = useState({ field: null, direction: 'asc' })
   const [expandedRowTabs, setExpandedRowTabs] = useState({}) // Track active tab for each expanded row
@@ -147,7 +147,7 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
     }))
   }
 
-  // Sort hits based on sortBy state
+  // Sort hits based on sortBy state (column sorts override timestamp sort)
   const sortedHits = (hits && sortBy.field) ? [...hits].sort((a, b) => {
     const aVal = getNestedValue(a, sortBy.field)
     const bVal = getNestedValue(b, sortBy.field)
@@ -296,7 +296,16 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
               }}
             >
               <div className="header-expand"></div>
-              <div className="header-time">Time</div>
+              <div className="header-time">
+                <span>Time</span>
+                <button
+                  className="sort-order-btn"
+                  onClick={() => onSortOrderChange?.(sortOrder === 'newest' ? 'oldest' : 'newest')}
+                  title={sortOrder === 'newest' ? 'Show oldest first' : 'Show newest first'}
+                >
+                  {sortOrder === 'newest' ? '↓' : '↑'}
+                </button>
+              </div>
               {selectedColumns.length === 0 ? (
                 <div className="header-document">Document</div>
               ) : (

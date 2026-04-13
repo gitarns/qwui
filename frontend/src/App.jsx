@@ -58,6 +58,7 @@ function App() {
   const [editFilterData, setEditFilterData] = useState({ field: '', operator: 'is', value: '' })
   const [selectedColumns, setSelectedColumns] = useState([]) // Track selected field columns
   const [viewMode, setViewMode] = useState('logs') // 'logs', 'visualize', or 'traces'
+  const [sortOrder, setSortOrder] = useState('newest') // 'newest' or 'oldest'
   const [numericFields, setNumericFields] = useState([]) // Track numeric fields for visualization
   const [showSettings, setShowSettings] = useState(false) // Track settings modal visibility
   const [userPreferences, setUserPreferences] = useState(() => {
@@ -1752,6 +1753,17 @@ function App() {
     return []
   }
 
+  // Handle sort order change with new search
+  const handleSortOrderChange = (newSortOrder) => {
+    setSortOrder(newSortOrder)
+    // Reset offset to 0 when changing sort order
+    setStartOffset(0)
+    // Execute search with new sort order (will use updated state via ref)
+    setTimeout(() => {
+      executeSearch(100, 0, false)
+    }, 0)
+  }
+
   // Unified search function that always reads from current state refs
   const executeSearch = async (maxHits = 100, offset = 0, appendResults = false, forceFetchDocs = false) => {
     // Guard: Don't search if no index is selected
@@ -1818,7 +1830,9 @@ function App() {
 
       // Add sort_by only for single-index (multi-index may have different schemas)
       if (timestampField && !selectedIndex.includes(',')) {
-        searchBody.sort_by = timestampField
+        // Sort by the configured timestamp field with direction based on sortOrder preference
+        // Quickwit format: fieldname (asc) or -fieldname (desc)
+        searchBody.sort_by = sortOrder === 'oldest' ? timestampField : `-${timestampField}`
       }
 
       // Add VRL if present
@@ -2567,6 +2581,8 @@ function App() {
               selectedColumns={selectedColumns}
               onRemoveColumn={handleToggleColumn}
               onFilterChange={handleFilterChange}
+              sortOrder={sortOrder}
+              onSortOrderChange={handleSortOrderChange}
               onToggleColumn={handleToggleColumn}
               userPreferences={userPreferences}
               darkMode={darkMode}
