@@ -168,28 +168,26 @@ jobs:
     steps:
       - name: Delete untagged images
         run: |
-          # Install crane if not available
-          if ! command -v crane &> /dev/null; then
-            go install github.com/google/go-containerregistry/cmd/crane@latest
-            export PATH=$PATH:$(go env GOPATH)/bin
-          fi
+          OWNER="${{ github.repository_owner }}"
+          PACKAGE="${{ matrix.image }}"
 
-          # Login to GHCR
-          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u ${{ github.actor }} --password-stdin
+          # Get all package versions
+          VERSIONS=$(gh api "/users/${OWNER}/packages/container/${PACKAGE}/versions" --paginate 2>/dev/null || gh api "/orgs/${OWNER}/packages/container/${PACKAGE}/versions" --paginate 2>/dev/null || echo '[]')
 
-          # Get all digests for this image
-          DIGESTS=$(crane ls ghcr.io/${{ github.repository_owner }}/${{ matrix.image }} --filter='^sha256:' 2>/dev/null || true)
+          # Find untagged versions (where tags array is empty)
+          UNTAGGED=$(echo "$VERSIONS" | jq -r '.[]? | select((.metadata.container.tags // []) | length == 0) | .id')
 
-          # Delete each untagged image (digests without tags)
-          if [ -n "$DIGESTS" ]; then
-            echo "Found untagged images, deleting..."
-            for digest in $DIGESTS; do
-              echo "Deleting: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@$digest"
-              crane delete "ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@$digest" 2>/dev/null || echo "Failed to delete $digest, might already be deleted"
+          if [ -z "$UNTAGGED" ]; then
+            echo "No untagged images found for ${PACKAGE}"
+          else
+            echo "Found untagged versions for ${PACKAGE}:"
+            echo "$UNTAGGED" | while read -r VERSION_ID; do
+              echo "Deleting version: ${VERSION_ID}"
+              gh api --method DELETE "/users/${OWNER}/packages/container/${PACKAGE}/versions/${VERSION_ID}" --silent 2>/dev/null || \
+              gh api --method DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${VERSION_ID}" --silent 2>/dev/null || \
+              echo "Failed to delete ${VERSION_ID}"
             done
             echo "Cleanup complete"
-          else
-            echo "No untagged images found"
           fi
         env:
-          REGISTRY: ghcr.io
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
