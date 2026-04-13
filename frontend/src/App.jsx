@@ -8,6 +8,8 @@ import TimeRangePicker from './components/TimeRangePicker'
 import Histogram from './components/Histogram'
 import GraphView from './components/GraphView'
 import TraceView from './components/TraceView'
+import VersionNotification from './components/VersionNotification'
+import { useVersionCheck } from './hooks/useVersionCheck'
 import SaveQueryModal from './components/SaveQueryModal'
 import LoadQueryModal from './components/LoadQueryModal'
 import ExportCSVModal from './components/ExportCSVModal'
@@ -59,6 +61,7 @@ function App() {
   const [selectedColumns, setSelectedColumns] = useState([]) // Track selected field columns
   const [viewMode, setViewMode] = useState('logs') // 'logs', 'visualize', or 'traces'
   const [sortOrder, setSortOrder] = useState('newest') // 'newest' or 'oldest'
+  const sortOrderRef = useRef('newest') // Ref to hold current sortOrder for immediate access
   const [numericFields, setNumericFields] = useState([]) // Track numeric fields for visualization
   const [showSettings, setShowSettings] = useState(false) // Track settings modal visibility
   const [userPreferences, setUserPreferences] = useState(() => {
@@ -1756,12 +1759,11 @@ function App() {
   // Handle sort order change with new search
   const handleSortOrderChange = (newSortOrder) => {
     setSortOrder(newSortOrder)
+    sortOrderRef.current = newSortOrder
     // Reset offset to 0 when changing sort order
     setStartOffset(0)
-    // Execute search with new sort order (will use updated state via ref)
-    setTimeout(() => {
-      executeSearch(100, 0, false)
-    }, 0)
+    // Execute search with new sort order (will use updated ref)
+    executeSearch(100, 0, false)
   }
 
   // Unified search function that always reads from current state refs
@@ -1831,8 +1833,8 @@ function App() {
       // Add sort_by only for single-index (multi-index may have different schemas)
       if (timestampField && !selectedIndex.includes(',')) {
         // Sort by the configured timestamp field with direction based on sortOrder preference
-        // Quickwit format: fieldname (asc) or -fieldname (desc)
-        searchBody.sort_by = sortOrder === 'oldest' ? timestampField : `-${timestampField}`
+        // Quickwit format: fieldname (desc = newest first) or -fieldname (asc = oldest first)
+        searchBody.sort_by = sortOrderRef.current === 'newest' ? timestampField : `-${timestampField}`
       }
 
       // Add VRL if present
@@ -2144,6 +2146,9 @@ function App() {
     // The actual storage is handled in FieldsSidebar
   }
 
+  // Check for new version availability
+  const { newVersionAvailable, reloadPage } = useVersionCheck()
+
   if (authStatus.loading) {
     return (
       <div className="loading-screen">
@@ -2159,6 +2164,7 @@ function App() {
 
   return (
     <div className="app">
+      <VersionNotification show={newVersionAvailable} onReload={reloadPage} />
       <header className="header">
         <div className="header-left">
           <h1>Quickwit Explorer</h1>

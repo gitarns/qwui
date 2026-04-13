@@ -62,6 +62,8 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
   const quickSelectRef = useRef(null)
   const fromPopupRef = useRef(null)
   const toPopupRef = useRef(null)
+  const fromInputRef = useRef(null)
+  const toInputRef = useRef(null)
 
   // Initialize with default range on mount
   useEffect(() => {
@@ -372,18 +374,18 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     }
   }
 
-  // Update input fields only when tab changes to absolute
+  // Update input fields when tab changes to absolute or when date changes (but not when input is focused)
   useEffect(() => {
-    if (fromTab === 'absolute') {
+    if (fromTab === 'absolute' && fromInputRef.current !== document.activeElement) {
       setFromDateInput(formatDateForInput(fromDate))
     }
-  }, [fromTab])
+  }, [fromTab, fromDate])
 
   useEffect(() => {
-    if (toTab === 'absolute') {
+    if (toTab === 'absolute' && toInputRef.current !== document.activeElement) {
       setToDateInput(formatDateForInput(toDate))
     }
-  }, [toTab])
+  }, [toTab, toDate])
 
   return (
     <div className="time-range-picker">
@@ -519,6 +521,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
                 <div className="manual-date-input-container">
                   <label>Manual input:</label>
                   <input
+                    ref={fromInputRef}
                     type="text"
                     value={fromDateInput}
                     onChange={(e) => handleFromDateInputChange(e.target.value)}
@@ -610,6 +613,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
                 <div className="manual-date-input-container">
                   <label>Manual input:</label>
                   <input
+                    ref={toInputRef}
                     type="text"
                     value={toDateInput}
                     onChange={(e) => handleToDateInputChange(e.target.value)}

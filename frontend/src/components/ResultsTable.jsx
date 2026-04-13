@@ -301,7 +301,7 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
                 <button
                   className="sort-order-btn"
                   onClick={() => onSortOrderChange?.(sortOrder === 'newest' ? 'oldest' : 'newest')}
-                  title={sortOrder === 'newest' ? 'Show oldest first' : 'Show newest first'}
+                  title={sortOrder === 'newest' ? 'Show newest first' : 'Show oldest first'}
                 >
                   {sortOrder === 'newest' ? '↓' : '↑'}
                 </button>
