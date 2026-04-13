@@ -1424,53 +1424,58 @@ function App() {
         })
       }
 
-      // OPTIMIZATION: Create a single aggregation request for all fields per time slice
-      // instead of separate requests per field per slice.
-      // This reduces requests from (fields × slices) to just (slices).
-      // E.g., 10 fields × 20 time slices = 200 requests → 20 requests
+      // Batch fields 10 at a time across each time slice
+      // Instead of one query per field per slice, this does 10 fields per query
+      const BATCH_SIZE = 10
       const allRequests = []
+
       timeSlices.forEach((slice, sliceIndex) => {
-        // Combine all fields into a single aggregation query
-        const aggs = {}
-        fieldsToFetch.forEach(fieldName => {
-          aggs[fieldName] = {
-            terms: {
-              field: fieldName,
-              size: 10
+        // Batch fields into groups of 10
+        for (let i = 0; i < fieldsToFetch.length; i += BATCH_SIZE) {
+          const fieldBatch = fieldsToFetch.slice(i, i + BATCH_SIZE)
+
+          // Create aggregation for this batch of fields
+          const aggs = {}
+          fieldBatch.forEach(fieldName => {
+            aggs[fieldName] = {
+              terms: {
+                field: fieldName,
+                size: 10
+              }
+            }
+          })
+
+          const aggsBody = {
+            query: queryWithFilters || '*',
+            max_hits: 0,
+            aggs: aggs
+          }
+
+          if (slice.start !== null) {
+            aggsBody.start_timestamp = slice.start
+            if (slice.end !== null) {
+              aggsBody.end_timestamp = slice.end
             }
           }
-        })
 
-        const aggsBody = {
-          query: queryWithFilters || '*',
-          max_hits: 0,
-          aggs: aggs
-        }
-
-        if (slice.start !== null) {
-          aggsBody.start_timestamp = slice.start
-          if (slice.end !== null) {
-            aggsBody.end_timestamp = slice.end
-          }
-        }
-
-        allRequests.push(
-          fetch(`${QUICKWIT_URL}/quickwit/api/v1/${selectedIndex}/search`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept-Encoding': 'gzip, deflate',
-              'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify(aggsBody)
-          })
-            .then(res => res.ok ? res.json() : null)
-            .catch(err => {
-              console.warn('Aggregation fetch failed for time slice', sliceIndex, err)
-              return null
+          allRequests.push(
+            fetch(`${QUICKWIT_URL}/quickwit/api/v1/${selectedIndex}/search`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept-Encoding': 'gzip, deflate',
+                'Access-Control-Allow-Origin': '*'
+              },
+              body: JSON.stringify(aggsBody)
             })
-            .then(data => ({ sliceIndex, data }))
-        )
+              .then(res => res.ok ? res.json() : null)
+              .catch(err => {
+                console.warn('Aggregation fetch failed for time slice', sliceIndex, 'field batch starting at', i, err)
+                return null
+              })
+              .then(data => ({ sliceIndex, fieldBatch, data }))
+          )
+        }
       })
 
       // Execute all requests in parallel
@@ -1485,13 +1490,13 @@ function App() {
         mergedAggregations[fieldName] = { buckets: {} }
       })
 
-      results.forEach(({ sliceIndex, data }) => {
+      results.forEach(({ sliceIndex, fieldBatch, data }) => {
         if (!data || !data.aggregations) {
           return
         }
 
         // Process each field in the aggregations response
-        fieldsToFetch.forEach(fieldName => {
+        fieldBatch.forEach(fieldName => {
           if (!data.aggregations[fieldName]) {
             failedFields.add(fieldName)
             return
