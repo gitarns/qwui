@@ -353,8 +353,8 @@ async fn auth_callback(
     info!("Auth callback - Received state: {}", params.state);
     info!("Auth callback - Stored state: {:?}", stored_state);
 
-    let is_state_invalid = match stored_state {
-        Some(s) => s != params.state,
+    let is_state_invalid = match &stored_state {
+        Some(s) => s != &params.state,
         None => true, // No stored state, so it's invalid
     };
 
