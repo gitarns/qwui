@@ -153,4 +153,43 @@ jobs:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
           charts_dir: helm
-          skip_existing: true
+          skip_existing: false
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: merge
+    permissions:
+      packages: write
+
+    strategy:
+      matrix:
+        image: [qwui-go, qwui-rust]
+
+    steps:
+      - name: Delete untagged images
+        run: |
+          # Install crane if not available
+          if ! command -v crane &> /dev/null; then
+            go install github.com/google/go-containerregistry/cmd/crane@latest
+            export PATH=$PATH:$(go env GOPATH)/bin
+          fi
+
+          # Login to GHCR
+          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          # Get all digests for this image
+          DIGESTS=$(crane ls ghcr.io/${{ github.repository_owner }}/${{ matrix.image }} --filter='^sha256:' 2>/dev/null || true)
+
+          # Delete each untagged image (digests without tags)
+          if [ -n "$DIGESTS" ]; then
+            echo "Found untagged images, deleting..."
+            for digest in $DIGESTS; do
+              echo "Deleting: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@$digest"
+              crane delete "ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@$digest" 2>/dev/null || echo "Failed to delete $digest, might already be deleted"
+            done
+            echo "Cleanup complete"
+          else
+            echo "No untagged images found"
+          fi
+        env:
+          REGISTRY: ghcr.io
