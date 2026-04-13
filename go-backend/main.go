@@ -346,6 +346,7 @@ func main() {
 			stateStr := fmt.Sprintf("%x", state)
 
 			session := sessions.Default(c)
+			session.Clear()
 			session.Set("oidc_state", stateStr)
 			if err := session.Save(); err != nil {
 				log.Error().Err(err).Msg("Failed to save session state")

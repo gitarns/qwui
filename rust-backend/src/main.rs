@@ -313,6 +313,9 @@ async fn login_handler(State(state): State<AppState>, session: Session) -> impl 
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "OIDC not enabled").into_response(),
     };
 
+    // Clear old session data to ensure fresh state
+    session.clear().await;
+
     let (auth_url, csrf_token, nonce) = client
         .authorize_url(
             AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
@@ -357,8 +360,8 @@ async fn auth_callback(
 
     if is_state_invalid {
         error!(
-            "Invalid state match. Stored: {:?}, Received: {}",
-            session.get::<String>("oidc_state").await.unwrap(),
+            "OIDC state validation failed - State is not good. Stored: {:?}, Received: {}",
+            stored_state,
             params.state
         );
         return (StatusCode::BAD_REQUEST, "Invalid state").into_response();
@@ -414,6 +417,7 @@ async fn auth_callback(
         sub: claims.subject().as_str().to_string(),
     };
 
+    info!("User logged in: {} ({})", user.name, user.email);
     session.insert("user", user).await.unwrap();
     session.remove::<String>("oidc_state").await.unwrap();
     session.remove::<String>("oidc_nonce").await.unwrap();
