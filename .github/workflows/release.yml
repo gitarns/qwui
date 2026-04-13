@@ -121,46 +121,11 @@ jobs:
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}@sha256:%s ' *)
 
-  cleanup:
-    runs-on: ubuntu-latest
-    needs: merge
-    permissions:
-      packages: write
-
-    strategy:
-      matrix:
-        image: [qwui-go, qwui-rust]
-
-    steps:
-      - name: Delete untagged images
-        run: |
-          OWNER="${{ github.repository_owner }}"
-          PACKAGE="${{ matrix.image }}"
-
-          # Get all package versions
-          VERSIONS=$(gh api "/users/${OWNER}/packages/container/${PACKAGE}/versions" --paginate 2>/dev/null || gh api "/orgs/${OWNER}/packages/container/${PACKAGE}/versions" --paginate 2>/dev/null || echo '[]')
-
-          # Find untagged versions (where tags array is empty)
-          UNTAGGED=$(echo "$VERSIONS" | jq -r '.[]? | select((.metadata.container.tags // []) | length == 0) | .id')
-
-          if [ -z "$UNTAGGED" ]; then
-            echo "No untagged images found for ${PACKAGE}"
-          else
-            echo "Found untagged versions for ${PACKAGE}:"
-            echo "$UNTAGGED" | while read -r VERSION_ID; do
-              echo "Deleting version: ${VERSION_ID}"
-              gh api --method DELETE "/users/${OWNER}/packages/container/${PACKAGE}/versions/${VERSION_ID}" --silent 2>/dev/null || \
-              gh api --method DELETE "/orgs/${OWNER}/packages/container/${PACKAGE}/versions/${VERSION_ID}" --silent 2>/dev/null || \
-              echo "Failed to delete ${VERSION_ID}"
-            done
-            echo "Cleanup complete"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
 
   update-chart:
     runs-on: ubuntu-latest
-    needs: cleanup
+    needs: merge
     permissions:
       contents: write
 
