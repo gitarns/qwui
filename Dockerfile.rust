@@ -5,6 +5,7 @@ RUN npm install
 COPY frontend/vite.config.js frontend/index.html ./
 COPY frontend/src ./src
 COPY frontend/public ./public
+COPY frontend/scripts ./scripts
 RUN npm run build
 
 FROM rust:1.90.0 AS rust-builder
