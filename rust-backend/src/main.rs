@@ -54,13 +54,13 @@ struct Config {
     oidc_secret: String,
     oidc_issuer: String,
     oidc_redirect: String,
-    _session_secret: String,
+    session_secret: Option<String>,
     _origin: String,
 }
 
 impl Config {
     fn from_env() -> Self {
-        Self {
+        let mut config = Self {
             port: env::var("PORT").unwrap_or_else(|_| "8080".to_string()),
             quickwit_url: env::var("QUICKWIT_URL")
                 .unwrap_or_else(|_| "http://localhost:7280".to_string()),
@@ -71,10 +71,18 @@ impl Config {
             oidc_secret: env::var("OIDC_CLIENT_SECRET").unwrap_or_default(),
             oidc_issuer: env::var("OIDC_ISSUER").unwrap_or_default(),
             oidc_redirect: env::var("OIDC_REDIRECT_URL").unwrap_or_default(),
-            _session_secret: env::var("SESSION_SECRET")
-                .unwrap_or_else(|_| "super-secret-key-must-be-32-bytes-long!".to_string()),
+            session_secret: env::var("SESSION_SECRET").ok(),
             _origin: env::var("ORIGIN").unwrap_or_else(|_| "*".to_string()),
+        };
+
+        // Disable OIDC if SESSION_SECRET is missing
+        if config.oidc_enabled && config.session_secret.is_none() {
+            eprintln!("WARNING: OIDC is enabled but SESSION_SECRET is not set. Disabling OIDC.");
+            eprintln!("Please set SESSION_SECRET environment variable for secure session management.");
+            config.oidc_enabled = false;
         }
+
+        config
     }
 }
 
@@ -216,7 +224,17 @@ async fn main() -> Result<()> {
     };
 
     // Session setup
-    let session_store = MemoryStore::default();
+    let session_store = if let Some(secret) = &config.session_secret {
+        if secret.len() < 32 {
+            eprintln!("WARNING: SESSION_SECRET is too short (must be at least 32 bytes)");
+        }
+        info!("Session store initialized with configured SESSION_SECRET");
+        MemoryStore::default()
+    } else {
+        info!("No SESSION_SECRET provided - sessions will not persist across restarts");
+        MemoryStore::default()
+    };
+
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false) // Set to true in production with HTTPS
         .with_same_site(tower_sessions::cookie::SameSite::Lax)

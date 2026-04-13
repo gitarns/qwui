@@ -112,15 +112,26 @@ func main() {
 	// Load .env file if it exists
 	_ = godotenv.Load()
 
+	oidcEnabled := getEnv("OIDC_ENABLED", "false") == "true"
+	sessionSecret := getEnv("SESSION_SECRET", "")
+
+	// Disable OIDC if SESSION_SECRET is missing
+	if oidcEnabled && sessionSecret == "" {
+		fmt.Fprintln(os.Stderr, "WARNING: OIDC is enabled but SESSION_SECRET is not set. Disabling OIDC.")
+		fmt.Fprintln(os.Stderr, "Please set SESSION_SECRET environment variable for secure session management.")
+		oidcEnabled = false
+	}
+
 	config = Config{
 		Port:          getEnv("PORT", "8080"),
 		QuickwitURL:   getEnv("QUICKWIT_URL", "http://localhost:7280"),
 		MaxExportDocs: 10000,
-		OIDCEnabled:   getEnv("OIDC_ENABLED", "false") == "true",
+		OIDCEnabled:   oidcEnabled,
 		OIDCClientID:  getEnv("OIDC_CLIENT_ID", ""),
 		OIDCSecret:    getEnv("OIDC_CLIENT_SECRET", ""),
 		OIDCIssuer:    getEnv("OIDC_ISSUER", ""),
 		OIDCRedirect:  getEnv("OIDC_REDIRECT_URL", ""),
+		SessionSecret: sessionSecret,
 		LogLevel:      getEnv("LOG_LEVEL", "info"),
 		Origin:        getEnv("ORIGIN", "*"),
 	}
@@ -186,10 +197,11 @@ func main() {
 	r.Use(CORSMiddleware(config.Origin))
 
 	// Setup Session Store
-	sessionSecret := getEnv("SESSION_SECRET", "super-secret-key-must-be-32-bytes-long!")
-	// Ensure 32 bytes
-	if len(sessionSecret) < 32 {
-		sessionSecret = fmt.Sprintf("%-32s", sessionSecret)[:32]
+	// Ensure 32 bytes if SESSION_SECRET was provided
+	if len(config.SessionSecret) == 0 {
+		log.Warn().Msg("SESSION_SECRET not provided - sessions will not persist across restarts")
+	} else if len(config.SessionSecret) < 32 {
+		log.Warn().Msgf("SESSION_SECRET is too short (must be at least 32 bytes)")
 	}
 
 	// Register types for session
@@ -204,7 +216,16 @@ func main() {
 	}
 	gob.Register(User{})
 
-	store := cookie.NewStore([]byte(sessionSecret))
+	// Prepare session secret - pad if necessary
+	sessionSecretBytes := []byte(config.SessionSecret)
+	if len(sessionSecretBytes) < 32 {
+		// Pad the secret to 32 bytes with spaces
+		padded := make([]byte, 32)
+		copy(padded, sessionSecretBytes)
+		sessionSecretBytes = padded
+	}
+
+	store := cookie.NewStore(sessionSecretBytes)
 	// Set cookie options
 	store.Options(sessions.Options{
 		Path:     "/",
