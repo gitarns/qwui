@@ -121,34 +121,6 @@ jobs:
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}@sha256:%s ' *)
 
-  helm-release:
-    runs-on: ubuntu-latest
-    needs: merge
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
-      - name: Release chart
-        uses: helm/chart-releaser-action@v1.6.0
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-        with:
-          charts_dir: helm
-          skip_existing: false
-
   cleanup:
     runs-on: ubuntu-latest
     needs: merge
@@ -185,3 +157,33 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-chart:
+    runs-on: ubuntu-latest
+    needs: cleanup
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update Chart.yaml from tag
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          sed -i "s/^version:.*/version: $VERSION/" helm/qwui/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"$VERSION\"/" helm/qwui/Chart.yaml
+
+      - name: Commit and push
+        run: |
+          if git diff --quiet helm/qwui/Chart.yaml; then
+            echo "No changes to Chart.yaml"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add helm/qwui/Chart.yaml
+            git commit -m "chore: update Chart.yaml to ${{ github.ref_name }}"
+            git push
+          fi
