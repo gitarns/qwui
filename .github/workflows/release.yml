@@ -141,12 +141,6 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
-      - name: Update chart version from tag
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          sed -i "s/^version:.*/version: \"$VERSION\"/" helm/qwui/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"$VERSION\"/" helm/qwui/Chart.yaml
-
       - name: Release chart
         uses: helm/chart-releaser-action@v1.6.0
         env:
