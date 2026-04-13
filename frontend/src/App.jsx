@@ -41,6 +41,7 @@ function App() {
   const [fieldCache, setFieldCache] = useState({}) // Cache discovered fields per index
   const [histogramData, setHistogramData] = useState(null)
   const [fieldAggregations, setFieldAggregations] = useState({}) // Store individual field aggregations
+  const [loadingFields, setLoadingFields] = useState(new Set()) // Track which fields are loading
   const [startOffset, setStartOffset] = useState(0) // Pagination offset
   const [hasMoreResults, setHasMoreResults] = useState(false) // Track if more results are available
   const [loadingMore, setLoadingMore] = useState(false) // Track if loading more results
@@ -1552,6 +1553,9 @@ function App() {
     // Fetch aggregation for a single field, splitting by time range into parallel batches
     if (!selectedIndex || !fieldName) return
 
+    // Mark field as loading
+    setLoadingFields(prev => new Set([...prev, fieldName]))
+
     // Calculate batch size based on time range duration
     let batchSize = 1
     if (lastUsedTimeRange && lastUsedTimeRange.from !== null && lastUsedTimeRange.from !== undefined && lastUsedTimeRange.to !== null && lastUsedTimeRange.to !== undefined) {
@@ -1668,6 +1672,13 @@ function App() {
     } catch (err) {
       // Aggregation fetch failed - keep previous data
       console.warn(`Failed to fetch aggregation for field ${fieldName}:`, err)
+    } finally {
+      // Mark field as done loading
+      setLoadingFields(prev => {
+        const next = new Set(prev)
+        next.delete(fieldName)
+        return next
+      })
     }
   }
 
@@ -2008,11 +2019,9 @@ function App() {
 
       setNumericFields(Array.from(numericFieldsFromMapping))
 
-      // Fetch aggregations for all discovered fields (only for initial search, not pagination)
-      if (!appendResults && discoveredFields && discoveredFields.length > 0) {
-        // Fire aggregations fetch in background (don't await it)
-        fetchAllFieldAggregations(discoveredFields, query, activeFilters, activeTimeRange)
-      }
+      // Fetch aggregations on-demand when user clicks on a field
+      // This avoids OOM issues with large field counts by fetching only what's needed
+      // (Disabled pre-fetching: fetchAllFieldAggregations call removed)
 
       // Calculate total request time (only for initial search, not when loading more)
       if (!appendResults) {
@@ -2384,6 +2393,7 @@ function App() {
         <FieldsSidebar
           fields={fields}
           aggregations={fieldAggregations}
+          loadingFields={loadingFields}
           onFilterChange={handleFilterChange}
           onFieldExpand={handleFieldExpand}
           selectedIndex={selectedIndex}

@@ -11,7 +11,7 @@ function savePopularity(data) {
   localStorage.setItem('fieldPopularity', JSON.stringify(data))
 }
 
-function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, selectedIndex, indexes, onIndexChange, selectedColumns = [], onToggleColumn, onSetDefaultIndex, viewMode }) {
+function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilterChange, onFieldExpand, selectedIndex, indexes, onIndexChange, selectedColumns = [], onToggleColumn, onSetDefaultIndex, viewMode }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [popularity, setPopularity] = useState(loadPopularity)
   const [defaultIndex, setDefaultIndex] = useState(() => {
@@ -71,9 +71,6 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
   const handleFieldClick = (field, event) => {
     event.stopPropagation()
 
-    const hasBuckets = aggregations?.[field]?.buckets?.length > 0
-    if (!hasBuckets) return
-
     // If clicking the same field that has the popover open, close it
     if (valueModalField === field) {
       setValueModalField(null)
@@ -111,8 +108,14 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
     left = Math.max(0, left)
     top = Math.max(0, top)
 
+    // Open popover immediately
     setPopoverPosition({ top, left })
     setValueModalField(field)
+
+    // Fetch aggregation in the background if not already loaded or loading
+    if (!aggregations?.[field]?.buckets && !loadingFields.has(field) && onFieldExpand) {
+      onFieldExpand(field)
+    }
   }
 
   const handleSetDefaultIndex = (indexId) => {
@@ -161,17 +164,20 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
     if (!valueModalField) return
     const handler = (e) => {
       const popover = document.querySelector('.values-popover')
+      const fieldHeader = e.target.closest('.field-header')
 
-      // Don't close if clicking on a field header or inside the popover
-      if (e.target.closest('.field-header') || (popover && popover.contains(e.target))) {
+      // Don't close if clicking inside the popover
+      if (popover && popover.contains(e.target)) {
         return
       }
 
-      // Close if clicking outside the sidebar entirely
-      const sidebar = document.querySelector('.sidebar')
-      if (sidebar && !sidebar.contains(e.target)) {
-        setValueModalField(null)
+      // Don't close if clicking a field header (let handleFieldClick handle it)
+      if (fieldHeader) {
+        return
       }
+
+      // Close on any other click
+      setValueModalField(null)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -305,10 +311,11 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
           <div className="fields-list selected-fields-list">
             {[...selectedColumns].sort((a, b) => a.localeCompare(b)).map(field => {
               const aggregation = getFieldAggregation(field)
+              const isLoading = loadingFields.has(field)
               const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
               return (
                 <div key={field} className="field-item selected-field-item">
-                  <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: hasBuckets ? 'pointer' : 'default' }}>
+                  <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: 'pointer' }}>
                     <div
                       className="field-header-main"
                       draggable={viewMode === 'visualize'}
@@ -321,13 +328,14 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                         e.dataTransfer.setData(`field:${field}`, '')
                       }}
                       style={{ cursor: viewMode === 'visualize' ? 'grab' : 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}
-                      title={!hasBuckets ? 'No aggregation data available' : field}
+                      title={field}
                     >
                       <span className="field-icon">t</span>
                       <span className="field-name" title={field}>
                         {field}
                       </span>
-                      {!hasBuckets && <span className="field-no-stats" title="No aggregation data">∅</span>}
+                      {isLoading && <span className="field-loading" title="Loading aggregation data">⟳</span>}
+                      {!isLoading && !hasBuckets && <span className="field-no-stats" title="Click to load aggregation data">◯</span>}
                     </div>
                     <button
                       className="add-column-btn selected"
@@ -361,11 +369,12 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
           <div className="popular-section-label">Popular</div>
           {filteredPopular.map(field => {
             const aggregation = aggregations?.[field]
+            const isLoading = loadingFields.has(field)
             const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
             const isColumnSelected = selectedColumns.includes(field)
             return (
               <div key={`popular-${field}`} className="field-item popular-field-item">
-                <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: hasBuckets ? 'pointer' : 'default' }}>
+                <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: 'pointer' }}>
                   <div
                     className="field-header-main"
                     draggable={viewMode === 'visualize'}
@@ -381,7 +390,8 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                   >
                     <span className="field-icon">t</span>
                     <span className="field-name" title={field}>{field}</span>
-                    {!hasBuckets && <span className="field-no-stats" title="No aggregation data">∅</span>}
+                    {isLoading && <span className="field-loading" title="Loading aggregation data">⟳</span>}
+                    {!isLoading && !hasBuckets && <span className="field-no-stats" title="Click to load aggregation data">◯</span>}
                   </div>
                   <button
                     className={`add-column-btn ${isColumnSelected ? 'selected' : ''}`}
@@ -406,12 +416,13 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
         ) : (
           filteredFields.map(field => {
             const aggregation = getFieldAggregation(field)
+            const isLoading = loadingFields.has(field)
             const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
             const isColumnSelected = selectedColumns.includes(field)
 
             return (
               <div key={field} className="field-item">
-                <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: hasBuckets ? 'pointer' : 'default' }}>
+                <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: 'pointer' }}>
                   <div
                     className="field-header-main"
                     draggable={viewMode === 'visualize'}
@@ -429,7 +440,8 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
                     <span className="field-name" title={field}>
                       {field}
                     </span>
-                    {!hasBuckets && <span className="field-no-stats" title="No aggregation data">∅</span>}
+                    {isLoading && <span className="field-loading" title="Loading aggregation data">⟳</span>}
+                    {!isLoading && !hasBuckets && <span className="field-no-stats" title="Click to load aggregation data">◯</span>}
                   </div>
                   <button
                     className={`add-column-btn ${isColumnSelected ? 'selected' : ''}`}
@@ -456,41 +468,52 @@ function FieldsSidebar({ fields, aggregations, onFilterChange, onFieldExpand, se
             <button className="values-popover-close" onClick={() => setValueModalField(null)}>×</button>
           </div>
           <div className="values-popover-content">
-            {aggregations?.[valueModalField]?.buckets?.slice(0, 10).map((bucket, idx) => {
-              const displayKey = bucket.key_as_string || String(bucket.key)
-              return (
-                <div key={idx} className="popover-bucket-item">
-                  <div className="popover-bucket-info">
-                    <span className="popover-bucket-key" title={displayKey}>
-                      {displayKey}
-                    </span>
-                    <span className="popover-bucket-count">{bucket.doc_count.toLocaleString()}</span>
+            {loadingFields.has(valueModalField) ? (
+              <div className="popover-loading">
+                <div className="loading-spinner"></div>
+                <p>Loading field values...</p>
+              </div>
+            ) : aggregations?.[valueModalField]?.buckets?.length > 0 ? (
+              aggregations[valueModalField].buckets.slice(0, 10).map((bucket, idx) => {
+                const displayKey = bucket.key_as_string || String(bucket.key)
+                return (
+                  <div key={idx} className="popover-bucket-item">
+                    <div className="popover-bucket-info">
+                      <span className="popover-bucket-key" title={displayKey}>
+                        {displayKey}
+                      </span>
+                      <span className="popover-bucket-count">{bucket.doc_count.toLocaleString()}</span>
+                    </div>
+                    <div className="popover-bucket-actions">
+                      <button
+                        className="popover-filter-btn popover-include-btn"
+                        onClick={() => {
+                          handleInclude(valueModalField, displayKey)
+                          setValueModalField(null)
+                        }}
+                        title="Include this value"
+                      >
+                        ⊕
+                      </button>
+                      <button
+                        className="popover-filter-btn popover-exclude-btn"
+                        onClick={() => {
+                          handleExclude(valueModalField, displayKey)
+                          setValueModalField(null)
+                        }}
+                        title="Exclude this value"
+                      >
+                        ⊖
+                      </button>
+                    </div>
                   </div>
-                  <div className="popover-bucket-actions">
-                    <button
-                      className="popover-filter-btn popover-include-btn"
-                      onClick={() => {
-                        handleInclude(valueModalField, displayKey)
-                        setValueModalField(null)
-                      }}
-                      title="Include this value"
-                    >
-                      ⊕
-                    </button>
-                    <button
-                      className="popover-filter-btn popover-exclude-btn"
-                      onClick={() => {
-                        handleExclude(valueModalField, displayKey)
-                        setValueModalField(null)
-                      }}
-                      title="Exclude this value"
-                    >
-                      ⊖
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })
+            ) : (
+              <div className="popover-empty">
+                <p>No data available</p>
+              </div>
+            )}
           </div>
         </div>
       )}
