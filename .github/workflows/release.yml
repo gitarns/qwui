@@ -122,33 +122,3 @@ jobs:
             $(printf '${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}@sha256:%s ' *)
 
   
-
-  update-chart:
-    runs-on: ubuntu-latest
-    needs: merge
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-
-      - name: Update Chart.yaml from tag
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          sed -i "s/^version:.*/version: $VERSION/" helm/qwui/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"$VERSION\"/" helm/qwui/Chart.yaml
-
-      - name: Commit and push
-        run: |
-          if git diff --quiet helm/qwui/Chart.yaml; then
-            echo "No changes to Chart.yaml"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add helm/qwui/Chart.yaml
-            git commit -m "chore: update Chart.yaml to ${{ github.ref_name }}"
-            git push
-          fi
