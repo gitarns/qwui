@@ -123,7 +123,12 @@ function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/status')
+        const response = await fetch('/api/auth/status', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        })
         if (response.ok) {
           const data = await response.json()
           setAuthStatus({

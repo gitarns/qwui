@@ -36,12 +36,52 @@ use tower_http::{
 use tower_sessions::{Expiry, MemoryStore, Session, SessionManagerLayer};
 use tracing::{error, info, Level};
 use vrl::compiler::{state::RuntimeState, Context, TimeZone};
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+
+/// StateStore manages OIDC state tokens with expiration
+#[derive(Clone)]
+struct StateStore {
+    states: Arc<Mutex<HashMap<String, std::time::SystemTime>>>,
+}
+
+impl StateStore {
+    fn new() -> Self {
+        Self {
+            states: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    fn save(&self, state: String) {
+        let expiration = std::time::SystemTime::now() + Duration::from_secs(600); // 10 minutes
+        if let Ok(mut states) = self.states.lock() {
+            states.insert(state, expiration);
+        }
+    }
+
+    fn verify(&self, state: &str) -> bool {
+        if let Ok(mut states) = self.states.lock() {
+            if let Some(expiration) = states.remove(state) {
+                return std::time::SystemTime::now() <= expiration;
+            }
+        }
+        false
+    }
+
+    fn cleanup(&self) {
+        if let Ok(mut states) = self.states.lock() {
+            let now = std::time::SystemTime::now();
+            states.retain(|_, exp| now <= *exp);
+        }
+    }
+}
 
 #[derive(Clone)]
 struct AppState {
     config: Config,
     client: ReqwestClient,
     oidc_client: Option<CoreClient>,
+    state_store: StateStore,
 }
 
 #[derive(Clone, Debug)]
@@ -221,6 +261,7 @@ async fn main() -> Result<()> {
         config: config.clone(),
         client,
         oidc_client,
+        state_store: StateStore::new(),
     };
 
     // Session setup
@@ -325,14 +366,11 @@ async fn main() -> Result<()> {
 
 // Auth Handlers
 
-async fn login_handler(State(state): State<AppState>, session: Session) -> impl IntoResponse {
-    let client = match state.oidc_client {
+async fn login_handler(State(app_state): State<AppState>, session: Session) -> impl IntoResponse {
+    let client = match app_state.oidc_client {
         Some(c) => c,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "OIDC not enabled").into_response(),
     };
-
-    // Clear old session data to ensure fresh state
-    session.clear().await;
 
     let (auth_url, csrf_token, nonce) = client
         .authorize_url(
@@ -345,10 +383,11 @@ async fn login_handler(State(state): State<AppState>, session: Session) -> impl 
         .url();
 
     info!("Generated OIDC state: {}", csrf_token.secret());
-    session
-        .insert("oidc_state", csrf_token.secret())
-        .await
-        .unwrap();
+
+    // Store state server-side (survives external redirects)
+    app_state.state_store.save(csrf_token.secret().to_string());
+
+    // Store nonce in session (still needed for ID token validation)
     session.insert("oidc_nonce", nonce.secret()).await.unwrap();
 
     Redirect::to(auth_url.as_str()).into_response()
@@ -361,31 +400,19 @@ struct AuthCallbackParams {
 }
 
 async fn auth_callback(
-    State(state): State<AppState>,
+    State(app_state): State<AppState>,
     session: Session,
     Query(params): Query<AuthCallbackParams>,
 ) -> impl IntoResponse {
-    let stored_state: Option<String> = session.get("oidc_state").await.unwrap();
-    let stored_nonce: Option<String> = session.get("oidc_nonce").await.unwrap();
-
-    info!("Auth callback - Received state: {}", params.state);
-    info!("Auth callback - Stored state: {:?}", stored_state);
-
-    let is_state_invalid = match &stored_state {
-        Some(s) => s != &params.state,
-        None => true, // No stored state, so it's invalid
-    };
-
-    if is_state_invalid {
-        error!(
-            "OIDC state validation failed - State is not good. Stored: {:?}, Received: {}",
-            stored_state,
-            params.state
-        );
-        return (StatusCode::BAD_REQUEST, "Invalid state").into_response();
+    // Verify state (prevents CSRF and ensures it was issued by us)
+    if !app_state.state_store.verify(&params.state) {
+        error!("OIDC state validation failed - Invalid or expired state: {}", params.state);
+        return (StatusCode::BAD_REQUEST, "Invalid or expired state").into_response();
     }
 
-    let client = state.oidc_client.unwrap();
+    let stored_nonce: Option<String> = session.get("oidc_nonce").await.unwrap();
+
+    let client = app_state.oidc_client.unwrap();
     let token_response = match client
         .exchange_code(openidconnect::AuthorizationCode::new(params.code))
         .request_async(openidconnect::reqwest::async_http_client)
@@ -437,7 +464,6 @@ async fn auth_callback(
 
     info!("User logged in: {} ({})", user.name, user.email);
     session.insert("user", user).await.unwrap();
-    session.remove::<String>("oidc_state").await.unwrap();
     session.remove::<String>("oidc_nonce").await.unwrap();
 
     Redirect::to("/").into_response()

@@ -49,6 +49,57 @@ type Config struct {
 	Origin        string
 }
 
+// StateStore manages OIDC state tokens with expiration
+type StateStore struct {
+	mu     sync.RWMutex
+	states map[string]time.Time // state -> expiration time
+}
+
+func NewStateStore() *StateStore {
+	store := &StateStore{
+		states: make(map[string]time.Time),
+	}
+	// Cleanup expired states every minute
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			store.Cleanup()
+		}
+	}()
+	return store
+}
+
+func (s *StateStore) Save(state string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// State valid for 10 minutes
+	s.states[state] = time.Now().Add(10 * time.Minute)
+}
+
+func (s *StateStore) Verify(state string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	expiration, exists := s.states[state]
+	if !exists || time.Now().After(expiration) {
+		delete(s.states, state)
+		return false
+	}
+	delete(s.states, state) // State can only be used once
+	return true
+}
+
+func (s *StateStore) Cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for state, expiration := range s.states {
+		if now.After(expiration) {
+			delete(s.states, state)
+		}
+	}
+}
+
 // responseWriter wraps http.ResponseWriter to capture status code
 type responseWriter struct {
 	http.ResponseWriter
@@ -135,6 +186,9 @@ func main() {
 		LogLevel:      getEnv("LOG_LEVEL", "info"),
 		Origin:        getEnv("ORIGIN", "*"),
 	}
+
+	// Initialize state store for OIDC
+	stateStore := NewStateStore()
 
 	// Set log level
 	lv, err := zerolog.ParseLevel(config.LogLevel)
@@ -251,8 +305,10 @@ func main() {
 		// Extract username from session
 		username := "anonymous"
 		session := sessions.Default(c)
-		if userEmail, ok := session.Get("email").(string); ok && userEmail != "" {
-			username = userEmail
+		if userVal := session.Get("user"); userVal != nil {
+			if user, ok := userVal.(User); ok && user.Email != "" {
+				username = user.Email
+			}
 		}
 
 		var request QuickwitSearchRequest
@@ -366,30 +422,18 @@ func main() {
 			}
 			stateStr := fmt.Sprintf("%x", state)
 
-			session := sessions.Default(c)
-			session.Clear()
-			session.Set("oidc_state", stateStr)
-			if err := session.Save(); err != nil {
-				log.Error().Err(err).Msg("Failed to save session state")
-				c.String(http.StatusInternalServerError, "Failed to save session")
-				return
-			}
+			// Store state server-side (survives external redirects)
+			stateStore.Save(stateStr)
 
 			c.Redirect(http.StatusFound, oauth2Config.AuthCodeURL(stateStr))
 		})
 
 		// Callback endpoint
 		r.GET("/auth/callback", func(c *gin.Context) {
-			session := sessions.Default(c)
-			state := session.Get("oidc_state")
-			if state == nil {
-				log.Warn().Msg("State not found in session during callback, redirecting to logout")
-				c.Redirect(http.StatusFound, "/logout")
-				return
-			}
-
-			if c.Query("state") != state.(string) {
-				c.String(http.StatusBadRequest, "State mismatch")
+			// Verify state (prevents CSRF and ensures it was issued by us)
+			if !stateStore.Verify(c.Query("state")) {
+				log.Warn().Str("state", c.Query("state")).Msg("Invalid or expired state during callback")
+				c.String(http.StatusBadRequest, "Invalid or expired state")
 				return
 			}
 
@@ -427,8 +471,9 @@ func main() {
 				Sub:   claims.Sub,
 			}
 
+			// Create session only after successful authentication
+			session := sessions.Default(c)
 			session.Set("user", user)
-			session.Delete("oidc_state") // Cleanup state
 			if err := session.Save(); err != nil {
 				log.Error().Err(err).Msg("Failed to save user in session")
 				c.String(http.StatusInternalServerError, "Failed to save session")
