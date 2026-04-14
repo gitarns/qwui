@@ -20,6 +20,7 @@ services:
     pull_policy: build
     ports:
       - "8080:8080"
+    env_file: .env
     environment:
       - QUICKWIT_URL=http://quickwit:7280
       - PORT=8080
@@ -36,6 +37,7 @@ services:
     pull_policy: build
     ports:
       - "8080:8080"
+    env_file: .env
     environment:
       - QUICKWIT_URL=http://quickwit:7280
       - PORT=8080
