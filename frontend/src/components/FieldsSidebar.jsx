@@ -113,7 +113,11 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
     setValueModalField(field)
 
     // Fetch aggregation in the background if not already loaded or loading
-    if (!aggregations?.[field]?.buckets && !loadingFields.has(field) && onFieldExpand) {
+    const hasBuckets = aggregations?.[field]?.buckets?.length > 0
+    const isLoading = loadingFields.has(field)
+    const shouldFetch = !hasBuckets && !isLoading && onFieldExpand
+
+    if (shouldFetch) {
       onFieldExpand(field)
     }
   }

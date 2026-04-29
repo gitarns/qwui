@@ -4,22 +4,45 @@ import ReactJson from '@microlink/react-json-view'
 import './ResultsTable.css'
 
 function extractHighlightTerms(query) {
-  if (!query || query.trim() === '*') return []
-  const terms = []
-  // quoted phrases
+  if (!query || query.trim() === '*') return { globalTerms: [], fieldTerms: {} }
+  const globalTerms = []
+  const fieldTerms = {}
+
+  // quoted phrases (global)
   const quoted = [...query.matchAll(/"([^"]+)"/g)]
-  quoted.forEach(m => terms.push(m[1]))
-  // strip quoted parts and field:value → extract the value
+  quoted.forEach(m => globalTerms.push(m[1]))
+
+  // strip quoted parts and extract field:value pairs
   let rest = query.replace(/"[^"]+"/g, '')
-  const fieldValues = [...rest.matchAll(/\w+:([^\s"]+)/g)]
-  fieldValues.forEach(m => { if (!m[1].includes('*')) terms.push(m[1]) })
+  const fieldMatches = [...rest.matchAll(/(\w+):([^\s"]+)/g)]
+  fieldMatches.forEach(m => {
+    const field = m[1]
+    const value = m[2]
+    if (!value.includes('*')) {
+      if (!fieldTerms[field]) {
+        fieldTerms[field] = []
+      }
+      fieldTerms[field].push(value)
+    }
+  })
+
   rest = rest.replace(/\w+:[^\s"]+/g, '')
-  // bare words (skip operators)
+
+  // bare words (skip operators) - these are global
   rest.split(/\s+/).forEach(w => {
     if (w && !['AND', 'OR', 'NOT', '*', '-'].includes(w.toUpperCase()) && !w.includes('*'))
-      terms.push(w)
+      globalTerms.push(w)
   })
-  return [...new Set(terms.filter(t => t.length >= 2))]
+
+  return {
+    globalTerms: [...new Set(globalTerms.filter(t => t.length >= 2))],
+    fieldTerms: Object.fromEntries(
+      Object.entries(fieldTerms).map(([field, terms]) => [
+        field,
+        [...new Set(terms.filter(t => t.length >= 2))]
+      ])
+    )
+  }
 }
 
 function highlightText(text, terms) {
@@ -31,6 +54,22 @@ function highlightText(text, terms) {
   return parts.map((part, i) =>
     regex.test(part) ? <mark key={i} className="search-highlight">{part}</mark> : part
   )
+}
+
+function highlightTextWithFieldTerms(text, highlightTerms, fieldName = '') {
+  if (!text) return text
+
+  // Get the terms to highlight for this field
+  let termsToUse = [...highlightTerms.globalTerms]
+
+  // Add field-specific terms if they exist for this field
+  if (fieldName && highlightTerms.fieldTerms[fieldName]) {
+    termsToUse = [...termsToUse, ...highlightTerms.fieldTerms[fieldName]]
+  }
+
+  if (!termsToUse.length) return text
+
+  return highlightText(text, termsToUse)
 }
 
 function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreResults = false, loadingMore = false, onLoadMore, requestTime = null, selectedColumns = [], onRemoveColumn, onFilterChange, onToggleColumn, userPreferences, darkMode = false, searchQuery = '', sortOrder = 'newest', onSortOrderChange }) {
@@ -263,17 +302,17 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
       return <span className="syntax-null">null</span>
     }
     if (typeof value === 'object') {
-      return <span className="syntax-object">{highlightText(JSON.stringify(value, null, 2), highlightTerms)}</span>
+      return <span className="syntax-object">{highlightTextWithFieldTerms(JSON.stringify(value, null, 2), highlightTerms, key)}</span>
     }
     if (isTimestamp(key, value)) {
       const formatted = formatTimestamp(value)
-      return <span className="syntax-string">{highlightText(formatted, highlightTerms)}</span>
+      return <span className="syntax-string">{highlightTextWithFieldTerms(formatted, highlightTerms, key)}</span>
     }
     if (typeof value === 'number') {
-      return <span className="syntax-number">{highlightText(String(value), highlightTerms)}</span>
+      return <span className="syntax-number">{highlightTextWithFieldTerms(String(value), highlightTerms, key)}</span>
     }
     if (typeof value === 'string') {
-      return <span className="syntax-string">{highlightText(value, highlightTerms)}</span>
+      return <span className="syntax-string">{highlightTextWithFieldTerms(value, highlightTerms, key)}</span>
     }
     if (typeof value === 'boolean') {
       return <span className="syntax-boolean">{String(value)}</span>
@@ -374,7 +413,7 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
                           {contentFields.map(([key, value], idx) => (
                             <span key={idx} className="field-value-pair">
                               <span className="field-name-badge">{key}:</span>
-                              <span className="field-value-text">{highlightText(JSON.stringify(value), highlightTerms)}</span>
+                              <span className="field-value-text">{highlightTextWithFieldTerms(JSON.stringify(value), highlightTerms, key)}</span>
                               {idx < contentFields.length - 1 && ' '}
                             </span>
                           ))}

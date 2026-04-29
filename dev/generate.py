@@ -194,15 +194,22 @@ QWUI_INDEX_CONFIG = {
     "doc_mapping": {
         "timestamp_field": "timestamp",
         "field_mappings": [
-            {"name": "timestamp", "type": "datetime", "fast": True,
+            {"name": "id",         "type": "text", "tokenizer": "raw", "stored": True},
+            {"name": "type",       "type": "text", "tokenizer": "raw", "stored": True},
+            {"name": "status",     "type": "bool", "stored": True},
+            {"name": "name",       "type": "text", "stored": True},
+            {"name": "timestamp",  "type": "datetime", "fast": True, "stored": True,
              "input_formats": ["rfc3339"], "output_format": "rfc3339"},
-            {"name": "type",  "type": "text", "tokenizer": "raw"},
-            {"name": "name",  "type": "text"},
-            {"name": "query", "type": "json", "stored": True},
+            {"name": "created_at", "type": "i64", "stored": True},
+            {"name": "modified_at","type": "i64", "stored": True},
         ],
     },
     "search_settings": {
         "default_search_fields": ["name", "type"],
+    },
+    "indexing_settings": {
+        "commit_timeout_secs": 5,
+        "split_num_docs_target": 10,
     },
 }
 

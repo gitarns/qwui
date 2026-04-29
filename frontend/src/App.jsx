@@ -354,18 +354,19 @@ function App() {
     try {
       const id = generateQueryId()
       const now = Math.floor(Date.now() / 1000)
+      const isoTimestamp = new Date().toISOString()
       const doc = {
         id,
         type: 'query',
         status: true,
         name,
-        timestamp: now,
+        timestamp: isoTimestamp,
         created_at: now,
         modified_at: now,
         query: captureCurrentQuery()
       }
 
-      const response = await fetch(`${QUICKWIT_URL}/quickwit/api/v1/${SAVED_QUERIES_INDEX}/ingest`, {
+      const response = await fetch(`${QUICKWIT_URL}/quickwit/api/v1/${SAVED_QUERIES_INDEX}/ingest?commit=force`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -392,18 +393,19 @@ function App() {
     try {
       // Insert updated version with status: true
       const now = Math.floor(Date.now() / 1000)
+      const isoTimestamp = new Date().toISOString()
       const doc = {
         id,
         type: 'query',
         status: true,
         name,
-        timestamp: now,
+        timestamp: isoTimestamp,
         created_at,
         modified_at: now,
         query: captureCurrentQuery()
       }
 
-      const response = await fetch(`${QUICKWIT_URL}/quickwit/api/v1/${SAVED_QUERIES_INDEX}/ingest`, {
+      const response = await fetch(`${QUICKWIT_URL}/quickwit/api/v1/${SAVED_QUERIES_INDEX}/ingest?commit=force`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -490,14 +492,15 @@ function App() {
     try {
       // Insert a new document with status: false to mark as deleted
       const now = Math.floor(Date.now() / 1000)
+      const isoTimestamp = new Date().toISOString()
       const doc = {
         id,
         type: 'query',
         status: false,  // Mark as deleted
-        timestamp: now
+        timestamp: isoTimestamp
       }
 
-      const response = await fetch(`${QUICKWIT_URL}/quickwit/api/v1/${SAVED_QUERIES_INDEX}/ingest`, {
+      const response = await fetch(`${QUICKWIT_URL}/quickwit/api/v1/${SAVED_QUERIES_INDEX}/ingest?commit=force`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2081,6 +2084,8 @@ function App() {
   }
 
   const handleRestoreHistoryState = (state) => {
+    // Clear field aggregations since we're restoring a historical query state
+    setFieldAggregations({})
     // Restore index + timestampField
     if (state.index && state.index !== selectedIndex) {
       setSelectedIndex(state.index)
@@ -2115,6 +2120,11 @@ function App() {
       setCurrentSearchBarQuery(query)
       currentSearchBarQueryRef.current = query
     }
+    // Clear the loaded query ID since we're starting a new search
+    setCurrentQueryId(null)
+    setCurrentQueryName(null)
+    // Clear field aggregations since query changed
+    setFieldAggregations({})
     // If the end of the time range is "now" (relative range), recompute before searching
     const currentRange = timeRangeRef.current
     if (currentRange?.label) {

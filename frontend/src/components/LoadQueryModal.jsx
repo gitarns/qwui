@@ -84,8 +84,14 @@ function LoadQueryModal({ savedQueries, onLoad, onDelete, onClose, currentQueryI
                         </span>
                       </div>
                       <div className="query-dates">
-                        <span>Created: {format(new Date(query.created_at * 1000), 'MMM dd, yyyy HH:mm')}</span>
-                        {query.modified_at !== query.created_at && (
+                        <span>
+                          {query.created_at ? (
+                            <>Created: {format(new Date(query.created_at * 1000), 'MMM dd, yyyy HH:mm')}</>
+                          ) : (
+                            <>Saved: {format(new Date(query.timestamp), 'MMM dd, yyyy HH:mm')}</>
+                          )}
+                        </span>
+                        {query.modified_at && query.modified_at !== query.created_at && (
                           <span>Modified: {format(new Date(query.modified_at * 1000), 'MMM dd, yyyy HH:mm')}</span>
                         )}
                       </div>
