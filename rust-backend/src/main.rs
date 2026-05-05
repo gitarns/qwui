@@ -1057,7 +1057,7 @@ async fn smart_proxy_middleware(
             };
 
             let indexer_endpoint = format!(
-                "{}{}",
+                "{}/{}",
                 indexer_url.trim_end_matches('/'),
                 path.trim_start_matches('/')
             );

@@ -308,7 +308,11 @@ func main() {
 		if strings.Contains(cleanPath, "/ingest") && c.Request.Method == "POST" && config.QuickwitIndexerURL != "" {
 			bodyBytes, err := io.ReadAll(c.Request.Body)
 			if err == nil {
-				indexerURL := config.QuickwitIndexerURL + strings.TrimPrefix(cleanPath, "/api/v1")
+				trimmedPath := strings.TrimPrefix(cleanPath, "/api/v1")
+				if !strings.HasPrefix(trimmedPath, "/") {
+					trimmedPath = "/" + trimmedPath
+				}
+				indexerURL := strings.TrimSuffix(config.QuickwitIndexerURL, "/") + trimmedPath
 				log.Info().Str("url", indexerURL).Msg("Routing ingest to indexer")
 
 				req, err := http.NewRequest("POST", indexerURL, bytes.NewReader(bodyBytes))
