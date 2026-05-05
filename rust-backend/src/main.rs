@@ -88,6 +88,7 @@ struct AppState {
 struct Config {
     port: String,
     quickwit_url: String,
+    quickwit_indexer_url: Option<String>,
     max_export_docs: usize,
     oidc_enabled: bool,
     oidc_client_id: String,
@@ -104,6 +105,7 @@ impl Config {
             port: env::var("PORT").unwrap_or_else(|_| "8080".to_string()),
             quickwit_url: env::var("QUICKWIT_URL")
                 .unwrap_or_else(|_| "http://localhost:7280".to_string()),
+            quickwit_indexer_url: env::var("QUICKWIT_INDEXER_URL").ok(),
             max_export_docs: 10000,
             oidc_enabled: env::var("OIDC_ENABLED").unwrap_or_else(|_| "false".to_string())
                 == "true",
@@ -329,7 +331,10 @@ async fn main() -> Result<()> {
             "/quickwit",
             protected_reverse_proxy
                 .layer(middleware::from_fn(log_quickwit_query))
-                .layer(middleware::from_fn(smart_proxy_middleware))
+                .layer(middleware::from_fn_with_state(
+                    state.clone(),
+                    smart_proxy_middleware,
+                ))
                 .layer(ServiceBuilder::new().layer(middleware::from_fn_with_state(
                     state.clone(),
                     auth_middleware,
@@ -1035,8 +1040,55 @@ async fn log_quickwit_query(mut req: Request, next: Next) -> Result<Response, St
     Ok(response)
 }
 
-async fn smart_proxy_middleware(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+async fn smart_proxy_middleware(
+    State(state): State<AppState>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
     let (mut parts, body) = req.into_parts();
+    let path = parts.uri.path().to_string();
+
+    // Route ingest requests to indexer if configured
+    if parts.method == Method::POST && path.contains("/ingest") {
+        if let Some(indexer_url) = &state.config.quickwit_indexer_url {
+            let body_bytes = match to_bytes(body, usize::MAX).await {
+                Ok(b) => b,
+                Err(_) => return Err(StatusCode::PAYLOAD_TOO_LARGE),
+            };
+
+            let indexer_endpoint = format!(
+                "{}{}",
+                indexer_url.trim_end_matches('/'),
+                path.trim_start_matches('/')
+            );
+
+            info!("Routing ingest request to indexer: {}", indexer_endpoint);
+
+            match state.client.post(&indexer_endpoint)
+                .headers(parts.headers.clone())
+                .body(body_bytes)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = match resp.bytes().await {
+                        Ok(b) => Body::from(b),
+                        Err(_) => Body::from(""),
+                    };
+                    info!("Ingest response from indexer: {}", status);
+                    return Ok(Response::builder()
+                        .status(status)
+                        .body(body)
+                        .unwrap_or_else(|_| Response::new(Body::from(""))));
+                }
+                Err(e) => {
+                    error!("Failed to forward ingest to indexer: {}", e);
+                    return Err(StatusCode::BAD_GATEWAY);
+                }
+            }
+        }
+    }
 
     // --- PRE-HANDLER PHASE: Extract and Remove Trigger Field ---
 

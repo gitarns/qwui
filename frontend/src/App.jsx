@@ -314,7 +314,10 @@ function App() {
         {
           headers: {
             'Accept-Encoding': 'gzip, deflate',
-            'Access-Control-Allow-Origin': '*'
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           },
         }
       )

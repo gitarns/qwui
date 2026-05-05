@@ -36,17 +36,18 @@ import (
 )
 
 type Config struct {
-	Port          string
-	QuickwitURL   string
-	MaxExportDocs int
-	OIDCEnabled   bool
-	OIDCClientID  string
-	OIDCSecret    string
-	OIDCIssuer    string
-	OIDCRedirect  string
-	SessionSecret string
-	LogLevel      string
-	Origin        string
+	Port               string
+	QuickwitURL        string
+	QuickwitIndexerURL string
+	MaxExportDocs      int
+	OIDCEnabled        bool
+	OIDCClientID       string
+	OIDCSecret         string
+	OIDCIssuer         string
+	OIDCRedirect       string
+	SessionSecret      string
+	LogLevel           string
+	Origin             string
 }
 
 // StateStore manages OIDC state tokens with expiration
@@ -174,9 +175,10 @@ func main() {
 	}
 
 	config = Config{
-		Port:          getEnv("PORT", "8080"),
-		QuickwitURL:   getEnv("QUICKWIT_URL", "http://localhost:7280"),
-		MaxExportDocs: 10000,
+		Port:               getEnv("PORT", "8080"),
+		QuickwitURL:        getEnv("QUICKWIT_URL", "http://localhost:7280"),
+		QuickwitIndexerURL: getEnv("QUICKWIT_INDEXER_URL", ""),
+		MaxExportDocs:      10000,
 		OIDCEnabled:   oidcEnabled,
 		OIDCClientID:  getEnv("OIDC_CLIENT_ID", ""),
 		OIDCSecret:    getEnv("OIDC_CLIENT_SECRET", ""),
@@ -300,7 +302,33 @@ func main() {
 	proxyHandler := func(c *gin.Context) {
 		startTime := time.Now()
 		originalPath := c.Request.URL.Path
-		c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/quickwit")
+		cleanPath := strings.TrimPrefix(c.Request.URL.Path, "/quickwit")
+
+		// Route ingest requests to indexer if configured
+		if strings.Contains(cleanPath, "/ingest") && c.Request.Method == "POST" && config.QuickwitIndexerURL != "" {
+			bodyBytes, err := io.ReadAll(c.Request.Body)
+			if err == nil {
+				indexerURL := config.QuickwitIndexerURL + strings.TrimPrefix(cleanPath, "/api/v1")
+				log.Info().Str("url", indexerURL).Msg("Routing ingest to indexer")
+
+				req, err := http.NewRequest("POST", indexerURL, bytes.NewReader(bodyBytes))
+				if err == nil {
+					// Copy headers
+					req.Header = c.Request.Header.Clone()
+					resp, err := httpClient.Do(req)
+					if err == nil {
+						defer resp.Body.Close()
+						respBody, _ := io.ReadAll(resp.Body)
+						c.DataFromReader(resp.StatusCode, int64(len(respBody)), resp.Header.Get("Content-Type"), bytes.NewReader(respBody), map[string]string{})
+						return
+					}
+				}
+				c.JSON(400, gin.H{"error": "failed to forward ingest"})
+				return
+			}
+		}
+
+		c.Request.URL.Path = cleanPath
 
 		// Extract username from session
 		username := "anonymous"

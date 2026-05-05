@@ -1,6 +1,7 @@
 services:
   quickwit:
-    image: quickwit/quickwit:latest
+    image: quickwit/quickwit:edge-slim-bookworm
+    pull_policy: always
     ports:
       - "7280:7280"
     volumes:
