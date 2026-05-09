@@ -1043,8 +1043,8 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
     }
 
     // Determine if we have grouped data
-    const isGrouped = chartData.groups && chartData.groups.length > 0
-    const data = isGrouped ? chartData.data : chartData
+    const isGrouped = chartData && chartData.groups && chartData.groups.length > 0
+    const data = isGrouped ? (chartData.data || []) : (Array.isArray(chartData) ? chartData : [])
     const groups = isGrouped ? chartData.groups : null
 
     // Get colors from selected color scheme
