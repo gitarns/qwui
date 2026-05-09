@@ -70,6 +70,7 @@ function App() {
     return saved ? JSON.parse(saved) : {
       defaultTab: 'table', // 'table' or 'json'
       fontSize: 13, // Font size in pixels (default 13px = 0.8125rem)
+      popularMaxFields: 5, // Maximum number of popular fields to show
       jsonViewOptions: {
         collapsed: false,
         displayDataTypes: true,
@@ -2285,6 +2286,24 @@ function App() {
                     <span style={{ minWidth: '3rem', textAlign: 'right' }}>{userPreferences.fontSize || 13}px</span>
                   </div>
                 </div>
+                <div className="settings-item">
+                  <label>Popular Fields Max:</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="range"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={userPreferences.popularMaxFields || 5}
+                      onChange={(e) => setUserPreferences({
+                        ...userPreferences,
+                        popularMaxFields: parseInt(e.target.value)
+                      })}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ minWidth: '1.5rem', textAlign: 'right' }}>{userPreferences.popularMaxFields || 5}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="settings-section">
@@ -2441,6 +2460,7 @@ function App() {
           onToggleColumn={handleToggleColumn}
           onSetDefaultIndex={handleSetDefaultIndex}
           viewMode={viewMode}
+          popularMaxFields={userPreferences.popularMaxFields}
         />
 
         <main className="content">

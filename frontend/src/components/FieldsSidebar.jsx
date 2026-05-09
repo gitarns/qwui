@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import './FieldsSidebar.css'
 
-const POPULAR_MAX = 10
-
 function loadPopularity() {
   try { return JSON.parse(localStorage.getItem('fieldPopularity') || '{}') } catch { return {} }
 }
@@ -11,7 +9,7 @@ function savePopularity(data) {
   localStorage.setItem('fieldPopularity', JSON.stringify(data))
 }
 
-function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilterChange, onFieldExpand, selectedIndex, indexes, onIndexChange, selectedColumns = [], onToggleColumn, onSetDefaultIndex, viewMode }) {
+function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilterChange, onFieldExpand, selectedIndex, indexes, onIndexChange, selectedColumns = [], onToggleColumn, onSetDefaultIndex, viewMode, popularMaxFields = 5 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [popularity, setPopularity] = useState(loadPopularity)
   const [defaultIndex, setDefaultIndex] = useState(() => {
@@ -36,7 +34,7 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
   const popularFields = Object.entries(indexPopularity)
     .filter(([f]) => fields.includes(f) && !selectedColumns.includes(f))
     .sort((a, b) => b[1] - a[1])
-    .slice(0, POPULAR_MAX)
+    .slice(0, popularMaxFields)
     .map(([f]) => f)
 
   const filteredFields = fields
