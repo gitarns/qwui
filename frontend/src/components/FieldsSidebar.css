@@ -142,12 +142,17 @@
   min-height: 30px;
 }
 
+.index-option {
+  color: var(--text-primary);
+}
+
 .index-option:hover {
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
 }
 
 .index-option.selected {
-  background: rgba(102, 126, 234, 0.08);
+  background: rgba(102, 126, 234, 0.15);
+  color: var(--text-primary);
 }
 
 .index-add-btn:disabled {
@@ -164,6 +169,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-primary);
 }
 
 .index-add-btn {
