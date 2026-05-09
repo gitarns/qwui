@@ -550,18 +550,17 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
           📖 Query Syntax
         </a>
 
-        {(firstEventTime || lastEventTime) && (
+        {timeRange && timeRange.from && timeRange.to && (
           <>
-            {firstEventTime && lastEventTime && (
+            {timeRange.from && timeRange.to && (
               <>
-                <span className="time-label">Earliest Bucket:</span>
+                <span className="time-label">Time Range:</span>
                 <span className="time-display">
-                  {new Date(firstEventTime * 1000).toLocaleString()}
+                  {new Date(timeRange.from * 1000).toLocaleString()}
                 </span>
                 <span className="time-separator">→</span>
-                <span className="time-label">Latest Bucket:</span>
                 <span className="time-display">
-                  {new Date(lastEventTime * 1000).toLocaleString()}
+                  {new Date(timeRange.to * 1000).toLocaleString()}
                 </span>
                 <label style={{ position: 'relative' }}>
                   Interval:

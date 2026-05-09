@@ -50,6 +50,7 @@ function App() {
   const [requestTime, setRequestTime] = useState(null) // Track full request time in milliseconds
   const [firstEventTime, setFirstEventTime] = useState(null) // First event timestamp
   const [lastEventTime, setLastEventTime] = useState(null) // Last event timestamp
+  const [visualizationStats, setVisualizationStats] = useState({ totalHits: null, elapsedTimeMicros: null, requestTime: null }) // Stats from visualization mode
   const [histogramInterval, setHistogramInterval] = useState('auto') // auto, ms, s, m, h, d, w, M, y
   const [darkMode, setDarkMode] = useState(() => {
     // Initialize from localStorage, default to false if not set
@@ -858,10 +859,10 @@ function App() {
       return
     }
 
-    const totalHits = searchResults.num_hits
-    const currentHits = searchResults.hits.length
+    const totalHits = viewMode === 'visualize' ? visualizationStats.totalHits : searchResults?.num_hits
+    const currentHits = searchResults?.hits?.length || 0
     const maxExportLimit = 10000
-    const exportCount = Math.min(totalHits, maxExportLimit)
+    const exportCount = totalHits ? Math.min(totalHits, maxExportLimit) : 0
 
     // Calculate size estimation from current sample
     // Note: Quickwit returns full JSON documents regardless of search_field parameter
@@ -2475,9 +2476,9 @@ function App() {
             histogramInterval={histogramInterval}
             onHistogramIntervalChange={onIntervalChange}
             intervalError={intervalError}
-            totalHits={searchResults?.num_hits}
-            elapsedTimeMicros={searchResults?.elapsed_time_micros}
-            requestTime={requestTime}
+            totalHits={viewMode === 'visualize' ? visualizationStats.totalHits : searchResults?.num_hits}
+            elapsedTimeMicros={viewMode === 'visualize' ? visualizationStats.elapsedTimeMicros : searchResults?.elapsed_time_micros}
+            requestTime={viewMode === 'visualize' ? visualizationStats.requestTime : requestTime}
             onCancelSearch={handleCancelSearch}
             defaultSearchFields={defaultSearchFields}
             onSaveQuery={(searchBarQuery) => {
@@ -2649,6 +2650,9 @@ function App() {
               onBucketTimesChange={({ first, last }) => {
                 setFirstEventTime(first)
                 setLastEventTime(last)
+              }}
+              onStatsUpdate={(stats) => {
+                setVisualizationStats(stats)
               }}
             />
           )}
