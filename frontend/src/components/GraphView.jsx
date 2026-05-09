@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import './GraphView.css'
 
-function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], timestampField = 'timestamp', numericFields = [], query = '*', histogramInterval = 'auto', onTimeRangeChange, searchTrigger = 0, onBucketTimesChange }) {
+function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], timestampField = 'timestamp', numericFields = [], query = '*', histogramInterval = 'auto', onTimeRangeChange, searchTrigger = 0, onBucketTimesChange, onStatsUpdate }) {
   // Load saved graph preferences from localStorage
   const loadGraphPreferences = () => {
     const saved = localStorage.getItem('graphCustomization')
@@ -492,6 +492,7 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
         requestBody.end_timestamp = Math.floor(endTime / 1000)
       }
 
+      const requestStartTime = performance.now()
       const response = await fetch(`${apiUrl}/quickwit/api/v1/${selectedIndex}/search`, {
         method: 'POST',
         headers: {
@@ -502,6 +503,8 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
       })
 
       const data = await response.json()
+      const requestEndTime = performance.now()
+      const totalRequestTime = requestEndTime - requestStartTime
 
       if (!response.ok) {
         // Check for bucket limit exceeded error
@@ -512,6 +515,15 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
           }
         }
         throw new Error(data.message || `HTTP error! status: ${response.status}`)
+      }
+
+      // Update parent with stats from this search
+      if (onStatsUpdate) {
+        onStatsUpdate({
+          totalHits: data.num_hits,
+          elapsedTimeMicros: data.elapsed_time_micros,
+          requestTime: totalRequestTime
+        })
       }
 
       // Parse aggregation results
