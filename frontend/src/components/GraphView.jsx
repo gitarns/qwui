@@ -33,7 +33,7 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
   const savedPrefs = loadGraphPreferences()
 
   const [yAxisField, setYAxisField] = useState(null)
-  const [groupByField, setGroupByField] = useState(null)
+  const [groupByFields, setGroupByFields] = useState([])
   const [aggregationFunc, setAggregationFunc] = useState(savedPrefs.aggregationFunc || 'sum')
   const [chartType, setChartType] = useState(savedPrefs.chartType || 'line')
   const [stackedMode, setStackedMode] = useState(savedPrefs.stackedMode || false)
@@ -139,10 +139,9 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
   ]
 
   useEffect(() => {
-    console.log('GraphView useEffect triggered - query:', query, 'startTime:', startTime, 'endTime:', endTime, 'searchTrigger:', searchTrigger)
     fetchAggregationData()
 
-  }, [yAxisField, groupByField, aggregationFunc, startTime, endTime, filters, query, histogramInterval, searchTrigger, selectedPercentiles])
+  }, [yAxisField, groupByFields, aggregationFunc, startTime, endTime, filters, query, histogramInterval, searchTrigger, selectedPercentiles])
 
   // Handle click outside to close advanced options panel
   useEffect(() => {
@@ -249,6 +248,22 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
       const escapedValue = escapeQueryValue(value)
       return `${field}:${escapedValue}`
     })
+  }
+
+  const buildGroupByAgg = (fields, metricAgg) => {
+    const buildLevel = (index) => {
+      const agg = {
+        terms: { field: fields[index], size: 100 }
+      }
+      const inner = index < fields.length - 1
+        ? { [`by_group_${index + 1}`]: buildLevel(index + 1) }
+        : metricAgg
+      if (inner && Object.keys(inner).length > 0) {
+        agg.aggs = inner
+      }
+      return agg
+    }
+    return { by_group_0: buildLevel(0) }
   }
 
   const buildQueryWithFilters = (baseQuery) => {
@@ -382,28 +397,12 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
       let agg = {}
 
       // Build aggregation: histogram first, then terms if needed, then metric
-      if (groupByField) {
-        // Grouped data with histogram + terms
-        agg.by_time = {
-          histogram: {
-            field: timestampField,
-            interval: calculateInterval(),
-            min_doc_count: 0
-          },
-          aggs: {
-            by_group: {
-              terms: {
-                field: groupByField,
-                size: 100
-              }
-            }
-          }
-        }
-
-        // Add Y-axis metric aggregation nested inside terms if Y-axis field is set
+      if (groupByFields.length > 0) {
+        // Grouped data with histogram + nested terms
+        let metricAgg = {}
         if (yAxisField) {
           if (aggregationFunc === 'percentiles') {
-            agg.by_time.aggs.by_group.aggs = {
+            metricAgg = {
               percentiles_value: {
                 percentiles: {
                   field: yAxisField,
@@ -412,7 +411,7 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
               }
             }
           } else {
-            agg.by_time.aggs.by_group.aggs = {
+            metricAgg = {
               [`${aggregationFunc}_value`]: {
                 [aggregationFunc]: {
                   field: yAxisField
@@ -420,6 +419,15 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
               }
             }
           }
+        }
+
+        agg.by_time = {
+          histogram: {
+            field: timestampField,
+            interval: calculateInterval(),
+            min_doc_count: 0
+          },
+          aggs: buildGroupByAgg(groupByFields, metricAgg)
         }
       } else if (yAxisField) {
         // Simple metric aggregation without histogram
@@ -539,8 +547,8 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
         })
       }
 
-      if (groupByField) {
-        // Process grouped data (histogram -> terms structure)
+      if (groupByFields.length > 0) {
+        // Process grouped data (histogram -> nested terms structure)
         const formattedData = processGroupedData(timeBuckets)
         setChartData(formattedData)
       } else {
@@ -585,63 +593,59 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
   }
 
   const processGroupedData = (timeBuckets) => {
-    // timeBuckets structure: [{ key: timestamp, by_group: { buckets: [{ key: "user1", ... }] } }, ...]
-    // We need to transform to: [{ name: "time1", user1: value1, user2: value2 }, ...]
-
     const dataMap = {}
-    const groupTotals = {} // Track total for each group to find top groups
+    const groupTotals = {}
 
-    // First pass: collect all data and calculate totals
+    const traverse = (buckets, level, keyParts, dataRow) => {
+      for (const bucket of buckets) {
+        const newParts = [...keyParts, String(bucket.key)]
+        const subBuckets = bucket[`by_group_${level + 1}`]?.buckets
+
+        if (subBuckets !== undefined) {
+          traverse(subBuckets, level + 1, newParts, dataRow)
+        } else {
+          const compositeKey = newParts.join(':')
+          let value
+
+          if (yAxisField) {
+            if (aggregationFunc === 'percentiles') {
+              const percentilesData = bucket.percentiles_value?.values || {}
+              selectedPercentiles.forEach(p => {
+                const key = `${p}.0`
+                const percentileGroupKey = `${compositeKey}_p${p}`
+                const percentileValue = percentilesData[key] || 0
+                dataRow[percentileGroupKey] = percentileValue
+                groupTotals[percentileGroupKey] = (groupTotals[percentileGroupKey] || 0) + percentileValue
+              })
+              return
+            } else {
+              value = bucket[`${aggregationFunc}_value`]?.value ?? 0
+            }
+          } else {
+            value = bucket.doc_count
+          }
+
+          dataRow[compositeKey] = value
+          groupTotals[compositeKey] = (groupTotals[compositeKey] || 0) + value
+        }
+      }
+    }
+
     timeBuckets.forEach(timeBucket => {
       const timestamp = timeBucket.key_as_string || new Date(timeBucket.key).toISOString()
-
       if (!dataMap[timestamp]) {
         dataMap[timestamp] = { name: timestamp }
       }
 
-      const groupBuckets = timeBucket.by_group?.buckets || []
-      groupBuckets.forEach(groupBucket => {
-        const groupKey = String(groupBucket.key)
-
-        let value
-        if (yAxisField) {
-          if (aggregationFunc === 'percentiles') {
-            // For percentiles with grouping, we need to handle multiple percentile values
-            // We'll use the median (p50) for sorting/totals but store all percentiles
-            const percentilesData = groupBucket.percentiles_value?.values || {}
-
-            // Store each percentile as a separate series
-            selectedPercentiles.forEach(p => {
-              const key = `${p}.0`
-              const percentileGroupKey = `${groupKey}_p${p}`
-              const percentileValue = percentilesData[key] || 0
-              dataMap[timestamp][percentileGroupKey] = percentileValue
-              groupTotals[percentileGroupKey] = (groupTotals[percentileGroupKey] || 0) + percentileValue
-            })
-
-            // Use median for backward compatibility
-            value = percentilesData['50.0'] || 0
-          } else {
-            value = groupBucket[`${aggregationFunc}_value`]?.value || 0
-          }
-        } else {
-          value = groupBucket.doc_count
-        }
-
-        if (aggregationFunc !== 'percentiles') {
-          dataMap[timestamp][groupKey] = value
-          groupTotals[groupKey] = (groupTotals[groupKey] || 0) + value
-        }
-      })
+      const topBuckets = timeBucket.by_group_0?.buckets || []
+      traverse(topBuckets, 0, [], dataMap[timestamp])
     })
 
-    // Get top N groups by total value (configurable via maxGroups)
     const topGroups = Object.entries(groupTotals)
       .sort(([, a], [, b]) => b - a)
       .slice(0, maxGroups)
       .map(([key]) => key)
 
-    // Filter data to only include top groups
     const filteredData = Object.values(dataMap).map(timePoint => {
       const filtered = { name: timePoint.name }
       topGroups.forEach(group => {
@@ -818,8 +822,12 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
     e.preventDefault()
     const field = e.dataTransfer.getData('field')
     if (field) {
-      setGroupByField(field)
+      setGroupByFields(prev => prev.includes(field) ? prev : [...prev, field])
     }
+  }
+
+  const handleRemoveGroupByField = (field) => {
+    setGroupByFields(prev => prev.filter(f => f !== field))
   }
 
   // Time range selection handlers
@@ -1004,13 +1012,9 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
     }
   }
 
-  const handleClearGroupBy = () => {
-    setGroupByField(null)
-  }
-
   // Check if we have valid data to display
   const hasData = () => {
-    if (loading || error || (!yAxisField && !groupByField)) {
+    if (loading || error || (!yAxisField && groupByFields.length === 0)) {
       return false
     }
     return Array.isArray(chartData)
@@ -1072,7 +1076,7 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
     let allKeys = groups || ['value']
 
     // For percentiles without grouping, use percentile series names
-    if (aggregationFunc === 'percentiles' && !groupByField && yAxisField) {
+    if (aggregationFunc === 'percentiles' && groupByFields.length === 0 && yAxisField) {
       allKeys = selectedPercentiles.map(p => `p${p}`)
     }
 
@@ -1402,25 +1406,29 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
         <div className="config-section">
           <h3>Group By / Breakdown</h3>
           <div
-            className={`drop-zone ${groupByField ? 'has-field' : ''}`}
+            className={`drop-zone ${groupByFields.length > 0 ? 'has-field' : ''}`}
             onDragOver={handleDragOver}
             onDrop={handleDropGroupBy}
           >
-            {groupByField ? (
-              <div className="selected-field-display">
-                <span className="field-icon">t</span>
-                <span className="field-name">{groupByField}</span>
-                <button
-                  className="clear-field-btn"
-                  onClick={handleClearGroupBy}
-                  title="Clear field"
-                >
-                  ×
-                </button>
+            {groupByFields.length > 0 ? (
+              <div className="group-by-fields">
+                {groupByFields.map(field => (
+                  <div key={field} className="selected-field-display">
+                    <span className="field-icon">t</span>
+                    <span className="field-name">{field}</span>
+                    <button
+                      className="clear-field-btn"
+                      onClick={() => handleRemoveGroupByField(field)}
+                      title="Remove field"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="drop-zone-placeholder">
-                Drag and drop a field to group by
+                Drag and drop fields to group by
               </div>
             )}
           </div>
@@ -1507,9 +1515,9 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
                     type="checkbox"
                     checked={showPercentage}
                     onChange={(e) => setShowPercentage(e.target.checked)}
-                    disabled={chartType !== 'bar' || !groupByField}
+                    disabled={chartType !== 'bar' || groupByFields.length === 0}
                   />
-                  <span>Show Percentage{(chartType !== 'bar' || !groupByField) ? ' (only for Bar charts with Group-by)' : ''}</span>
+                  <span>Show Percentage{(chartType !== 'bar' || groupByFields.length === 0) ? ' (only for Bar charts with Group-by)' : ''}</span>
                 </label>
               </div>
 

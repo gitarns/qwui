@@ -19,6 +19,7 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
   const fieldRefs = useRef({})
 
+
   // primary index (first in comma-joined list) used as key for popularity
   const primaryIndex = selectedIndex.split(',')[0] || selectedIndex
 
@@ -326,10 +327,52 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                           e.preventDefault()
                           return
                         }
+                        e.dataTransfer.effectAllowed = 'copy'
                         e.dataTransfer.setData('field', field)
                         e.dataTransfer.setData(`field:${field}`, '')
+
+                        // Create a visible ghost element
+                        const ghost = document.createElement('div')
+                        ghost.textContent = field
+                        ghost.style.position = 'fixed'
+                        ghost.style.padding = '8px 12px'
+                        ghost.style.backgroundColor = '#667eea'
+                        ghost.style.color = 'white'
+                        ghost.style.borderRadius = '4px'
+                        ghost.style.fontSize = '13px'
+                        ghost.style.fontWeight = '500'
+                        ghost.style.pointerEvents = 'none'
+                        ghost.style.zIndex = '100000'
+                        ghost.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
+                        ghost.style.whiteSpace = 'nowrap'
+                        ghost.id = 'drag-ghost-' + Date.now()
+                        document.body.appendChild(ghost)
+
+                        const ghostId = ghost.id
+                        let lastX = e.clientX
+                        let lastY = e.clientY
+                        ghost.style.left = (lastX + 10) + 'px'
+                        ghost.style.top = (lastY + 10) + 'px'
+
+                        const moveGhost = (evt) => {
+                          const g = document.getElementById(ghostId)
+                          if (g) {
+                            g.style.left = (evt.clientX + 10) + 'px'
+                            g.style.top = (evt.clientY + 10) + 'px'
+                          }
+                        }
+
+                        const cleanup = () => {
+                          const g = document.getElementById(ghostId)
+                          if (g) g.remove()
+                          document.removeEventListener('pointermove', moveGhost)
+                          document.removeEventListener('pointerup', cleanup)
+                        }
+
+                        document.addEventListener('pointermove', moveGhost)
+                        document.addEventListener('pointerup', cleanup)
                       }}
-                      style={{ cursor: viewMode === 'visualize' ? 'grab' : 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}
+                      style={{ cursor: viewMode === 'visualize' ? 'grab' : 'pointer', flex: 1, display: 'flex', alignItems: 'center', transition: 'opacity 0.2s' }}
                       title={field}
                     >
                       <span className="field-icon">t</span>
@@ -385,8 +428,43 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                         e.preventDefault()
                         return
                       }
+                      e.dataTransfer.effectAllowed = 'copy'
                       e.dataTransfer.setData('field', field)
                       e.dataTransfer.setData(`field:${field}`, '')
+
+                      // Create a visible ghost element
+                      const ghost = document.createElement('div')
+                      ghost.textContent = field
+                      ghost.style.position = 'fixed'
+                      ghost.style.padding = '8px 12px'
+                      ghost.style.backgroundColor = '#667eea'
+                      ghost.style.color = 'white'
+                      ghost.style.borderRadius = '4px'
+                      ghost.style.fontSize = '13px'
+                      ghost.style.fontWeight = '500'
+                      ghost.style.pointerEvents = 'none'
+                      ghost.style.zIndex = '100000'
+                      ghost.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
+                      ghost.style.whiteSpace = 'nowrap'
+                      ghost.style.left = (e.clientX + 10) + 'px'
+                      ghost.style.top = (e.clientY + 10) + 'px'
+                      document.body.appendChild(ghost)
+
+                      const handleDrag = (evt) => {
+                        if (evt.clientX || evt.clientY) {
+                          ghost.style.left = (evt.clientX + 10) + 'px'
+                          ghost.style.top = (evt.clientY + 10) + 'px'
+                        }
+                      }
+
+                      const handleDragEnd = () => {
+                        ghost.remove()
+                        e.target.removeEventListener('drag', handleDrag)
+                        e.target.removeEventListener('dragend', handleDragEnd)
+                      }
+
+                      e.target.addEventListener('drag', handleDrag)
+                      e.target.addEventListener('dragend', handleDragEnd)
                     }}
                     style={{ cursor: viewMode === 'visualize' ? 'grab' : 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}
                   >
@@ -433,8 +511,43 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                         e.preventDefault()
                         return
                       }
+                      e.dataTransfer.effectAllowed = 'copy'
                       e.dataTransfer.setData('field', field)
                       e.dataTransfer.setData(`field:${field}`, '')
+
+                      // Create a visible ghost element
+                      const ghost = document.createElement('div')
+                      ghost.textContent = field
+                      ghost.style.position = 'fixed'
+                      ghost.style.padding = '8px 12px'
+                      ghost.style.backgroundColor = '#667eea'
+                      ghost.style.color = 'white'
+                      ghost.style.borderRadius = '4px'
+                      ghost.style.fontSize = '13px'
+                      ghost.style.fontWeight = '500'
+                      ghost.style.pointerEvents = 'none'
+                      ghost.style.zIndex = '100000'
+                      ghost.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
+                      ghost.style.whiteSpace = 'nowrap'
+                      ghost.style.left = (e.clientX + 10) + 'px'
+                      ghost.style.top = (e.clientY + 10) + 'px'
+                      document.body.appendChild(ghost)
+
+                      const handleDrag = (evt) => {
+                        if (evt.clientX || evt.clientY) {
+                          ghost.style.left = (evt.clientX + 10) + 'px'
+                          ghost.style.top = (evt.clientY + 10) + 'px'
+                        }
+                      }
+
+                      const handleDragEnd = () => {
+                        ghost.remove()
+                        e.target.removeEventListener('drag', handleDrag)
+                        e.target.removeEventListener('dragend', handleDragEnd)
+                      }
+
+                      e.target.addEventListener('drag', handleDrag)
+                      e.target.addEventListener('dragend', handleDragEnd)
                     }}
                     style={{ cursor: viewMode === 'visualize' ? 'grab' : 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}
                   >
