@@ -230,6 +230,21 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
     return escaped
   }
 
+  const quoteFilterValue = (value) => {
+    if (typeof value !== 'string') {
+      value = String(value)
+    }
+
+    const trimmed = value.trim()
+    if (trimmed === '*' || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+      return trimmed
+    }
+
+    const escapedValue = escapeQueryValue(trimmed)
+    const needsQuotes = /[\s:\{\}\[\]\(\)"\\]/.test(trimmed)
+    return needsQuotes ? `"${escapedValue}"` : escapedValue
+  }
+
   // Escape search query while preserving field:value syntax
   const escapeSearchQuery = (query) => {
     if (!query || query === '*') return query
@@ -273,13 +288,13 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
     if (filters.length === 0) return escapedBaseQuery
 
     const filterClauses = filters.map(filter => {
-      const escapedValue = escapeQueryValue(filter.value)
+      const quotedValue = quoteFilterValue(filter.value)
 
       if (filter.type === 'exclude') {
         // For "is not" filters, ensure field exists with field:* AND NOT field:value
-        return `(${filter.field}:* AND NOT ${filter.field}:${escapedValue})`
+        return `(${filter.field}:* AND NOT ${filter.field}:${quotedValue})`
       }
-      return `${filter.field}:${escapedValue}`
+      return `${filter.field}:${quotedValue}`
     })
 
     if (!baseQuery || baseQuery.trim() === '' || baseQuery === '*') {

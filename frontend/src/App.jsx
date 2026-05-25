@@ -1152,6 +1152,21 @@ function App() {
     return escaped
   }
 
+  const quoteFilterValue = (value) => {
+    if (typeof value !== 'string') {
+      value = String(value)
+    }
+
+    const trimmed = value.trim()
+    if (trimmed === '*' || (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+      return trimmed
+    }
+
+    const escapedValue = escapeQueryValue(trimmed)
+    const needsQuotes = /[\s:\{\}\[\]\(\)"\\]/.test(trimmed)
+    return needsQuotes ? `"${escapedValue}"` : escapedValue
+  }
+
   // No escaping - return query as-is
   const escapeSearchQuery = (query) => {
     return query
@@ -1168,19 +1183,19 @@ function App() {
       const filterClauses = filtersToUse
         .filter(f => !f.disabled) // Skip disabled filters
         .map(f => {
-          const escapedValue = escapeQueryValue(f.value)
+          const quotedValue = quoteFilterValue(f.value)
           if (f.type === 'include') {
-            return `${f.field}:${escapedValue}`
+            return `${f.field}:${quotedValue}`
           } else if (f.type === 'exclude') {
             // For "is not" filters, ensure field exists with field:* AND NOT field:value
-            return `(${f.field}:* AND NOT ${f.field}:${escapedValue})`
+            return `(${f.field}:* AND NOT ${f.field}:${quotedValue})`
           } else if (f.type === 'exists') {
             return `${f.field}:*`
           } else if (f.type === 'not_exists') {
             return `NOT ${f.field}:*`
           } else {
             // Fallback for backwards compatibility
-            return `(${f.field}:* AND NOT ${f.field}:${escapedValue})`
+            return `(${f.field}:* AND NOT ${f.field}:${quotedValue})`
           }
         })
       clauses.push(...filterClauses)
