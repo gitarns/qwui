@@ -482,11 +482,11 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
         {timeRangePicker}
         <button
           type="button"
-          className={`search-button ${loading ? 'loading' : ''} `}
+          className={`search-button ${loading && !liveMode ? 'loading' : ''} `}
           onClick={loading ? onCancelSearch : handleSubmit}
           disabled={liveMode}
         >
-          {loading ? (
+          {loading && !liveMode ? (
             <>
               <span className="loading-spinner"></span>
               Cancel
