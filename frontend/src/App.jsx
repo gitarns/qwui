@@ -31,6 +31,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [abortController, setAbortController] = useState(null)
+  const [liveMode, setLiveMode] = useState(false) // Auto-refresh mode
+  const [liveInterval, setLiveInterval] = useState(5) // Refresh interval in seconds
   const [currentQuery, setCurrentQuery] = useState('*')
   const [filters, setFilters] = useState([])
   const filtersRef = useRef([]) // Ref to hold current filters for immediate access
@@ -2176,6 +2178,50 @@ function App() {
     }
   }
 
+  // Live mode: keep a ref to the latest refresh routine so the interval always
+  // re-runs the search against a freshly computed "Last 1 minute" window.
+  const liveRefreshRef = useRef(null)
+  liveRefreshRef.current = () => {
+    const now = Math.floor(Date.now() / 1000)
+    const refreshed = {
+      from: now - 300,
+      to: now,
+      label: 'Last 5 minutes',
+      fromIsNow: false,
+      toIsNow: true
+    }
+    setTimeRange(refreshed)
+    timeRangeRef.current = refreshed
+    setFieldAggregations({})
+    executeSearch(100)
+  }
+
+  const handleToggleLiveMode = () => {
+    if (liveMode) {
+      setLiveMode(false)
+      return
+    }
+    setLiveMode(true)
+    // Switch to the last 5 minutes and trigger an immediate refresh
+    const now = Math.floor(Date.now() / 1000)
+    handleTimeRangeChange({
+      from: now - 300,
+      to: now,
+      label: 'Last 5 minutes',
+      fromIsNow: false,
+      toIsNow: true
+    })
+  }
+
+  // Auto-refresh loop while live mode is active
+  useEffect(() => {
+    if (!liveMode) return
+    const id = setInterval(() => {
+      if (liveRefreshRef.current) liveRefreshRef.current()
+    }, liveInterval * 1000)
+    return () => clearInterval(id)
+  }, [liveMode, liveInterval])
+
   const handleSetDefaultIndex = (indexId) => {
     // This is just a callback for the FieldsSidebar
     // The actual storage is handled in FieldsSidebar
@@ -2495,6 +2541,10 @@ function App() {
             elapsedTimeMicros={viewMode === 'visualize' ? visualizationStats.elapsedTimeMicros : searchResults?.elapsed_time_micros}
             requestTime={viewMode === 'visualize' ? visualizationStats.requestTime : requestTime}
             onCancelSearch={handleCancelSearch}
+            liveMode={liveMode}
+            liveInterval={liveInterval}
+            onToggleLiveMode={handleToggleLiveMode}
+            onLiveIntervalChange={setLiveInterval}
             defaultSearchFields={defaultSearchFields}
             onSaveQuery={(searchBarQuery) => {
               setCurrentSearchBarQuery(searchBarQuery)
@@ -2632,6 +2682,7 @@ function App() {
             <ResultsTable
               results={searchResults}
               loading={loading}
+              liveMode={liveMode}
               searchQuery={lastSearchQuery}
               timestampField={timestampField}
               hasMoreResults={hasMoreResults}

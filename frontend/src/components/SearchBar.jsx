@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import './SearchBar.css'
 
-function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIndex, onFetchFieldValues, firstEventTime, lastEventTime, histogramInterval, onHistogramIntervalChange, intervalError, totalHits, elapsedTimeMicros, requestTime, onCancelSearch, defaultSearchFields = [], onSaveQuery, onLoadQuery, onShareQuery, externalQuery = '', selectedColumns = [], results = [], onExportCSV, onQueryChange, vrl, onVrlChange, vrlTime, vrlEnabled = false, filters = [], timeRange, onFiltersChange, onTimeRangeChange, onAnalyzePatterns, onRestoreHistoryState }) {
+function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIndex, onFetchFieldValues, firstEventTime, lastEventTime, histogramInterval, onHistogramIntervalChange, intervalError, totalHits, elapsedTimeMicros, requestTime, onCancelSearch, liveMode = false, liveInterval = 5, onToggleLiveMode, onLiveIntervalChange, defaultSearchFields = [], onSaveQuery, onLoadQuery, onShareQuery, externalQuery = '', selectedColumns = [], results = [], onExportCSV, onQueryChange, vrl, onVrlChange, vrlTime, vrlEnabled = false, filters = [], timeRange, onFiltersChange, onTimeRangeChange, onAnalyzePatterns, onRestoreHistoryState }) {
   const [query, setQuery] = useState('')
 
   // Query history management
@@ -484,6 +484,7 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
           type="button"
           className={`search-button ${loading ? 'loading' : ''} `}
           onClick={loading ? onCancelSearch : handleSubmit}
+          disabled={liveMode}
         >
           {loading ? (
             <>
@@ -494,6 +495,29 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
             'Search'
           )}
         </button>
+        <div className="live-mode-controls">
+          <button
+            type="button"
+            className={`live-mode-button ${liveMode ? 'active' : ''}`}
+            onClick={onToggleLiveMode}
+            title={liveMode ? 'Stop live refresh' : 'Enable live mode (auto-refresh the last 5 minutes)'}
+          >
+            <span className="live-mode-dot"></span>
+            Live
+          </button>
+          {liveMode && (
+            <select
+              className="live-interval-select"
+              value={liveInterval}
+              onChange={(e) => onLiveIntervalChange(Number(e.target.value))}
+              title="Refresh interval"
+            >
+              <option value={5}>5s</option>
+              <option value={15}>15s</option>
+              <option value={60}>1m</option>
+            </select>
+          )}
+        </div>
       </div>
 
       {vrlEnabled && showVrlInput && (

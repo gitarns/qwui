@@ -313,6 +313,89 @@
   animation: spin 0.8s linear infinite;
 }
 
+.live-mode-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.live-mode-button {
+  padding: 0.5rem 1rem;
+  background: white;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.live-mode-button:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.live-mode-button .live-mode-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.live-mode-button.active {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: white;
+}
+
+.live-mode-button.active:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.live-mode-button.active .live-mode-dot {
+  background: white;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.live-interval-select {
+  padding: 0.5rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  background: white;
+  cursor: pointer;
+}
+
+.dark-mode .live-mode-button {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.dark-mode .live-mode-button:hover {
+  background: #374151;
+  border-color: #6b7280;
+}
+
+.dark-mode .live-interval-select {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

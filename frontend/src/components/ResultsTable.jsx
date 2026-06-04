@@ -72,7 +72,7 @@ function highlightTextWithFieldTerms(text, highlightTerms, fieldName = '') {
   return highlightText(text, termsToUse)
 }
 
-function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreResults = false, loadingMore = false, onLoadMore, requestTime = null, selectedColumns = [], onRemoveColumn, onFilterChange, onToggleColumn, userPreferences, darkMode = false, searchQuery = '', sortOrder = 'newest', onSortOrderChange }) {
+function ResultsTable({ results, loading, liveMode = false, timestampField = 'timestamp', hasMoreResults = false, loadingMore = false, onLoadMore, requestTime = null, selectedColumns = [], onRemoveColumn, onFilterChange, onToggleColumn, userPreferences, darkMode = false, searchQuery = '', sortOrder = 'newest', onSortOrderChange }) {
   const [expandedRows, setExpandedRows] = useState(new Set())
   const [sortBy, setSortBy] = useState({ field: null, direction: 'asc' })
   const [expandedRowTabs, setExpandedRowTabs] = useState({}) // Track active tab for each expanded row
@@ -129,7 +129,10 @@ function ResultsTable({ results, loading, timestampField = 'timestamp', hasMoreR
     return () => scrollContainer.removeEventListener('scroll', handleScroll)
   }, [hasMoreResults, loadingMore, onLoadMore])
 
-  if (loading) {
+  // During a live refresh, keep the current results on screen instead of
+  // flashing the "Searching..." placeholder. Only show it for the initial
+  // search (or when no results are available yet).
+  if (loading && (!liveMode || !results)) {
     return (
       <div className="results-container">
         <div className="loading-state">Searching...</div>
