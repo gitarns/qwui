@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import './SearchBar.css'
 
-function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIndex, onFetchFieldValues, firstEventTime, lastEventTime, histogramInterval, onHistogramIntervalChange, intervalError, totalHits, elapsedTimeMicros, requestTime, onCancelSearch, liveMode = false, liveInterval = 5, onToggleLiveMode, onLiveIntervalChange, defaultSearchFields = [], onSaveQuery, onLoadQuery, onShareQuery, externalQuery = '', selectedColumns = [], results = [], onExportCSV, onQueryChange, vrl, onVrlChange, vrlTime, vrlEnabled = false, filters = [], timeRange, onFiltersChange, onTimeRangeChange, onAnalyzePatterns, onRestoreHistoryState }) {
+function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIndex, onFetchFieldValues, firstEventTime, lastEventTime, histogramInterval, onHistogramIntervalChange, intervalError, totalHits, elapsedTimeMicros, requestTime, onCancelSearch, liveMode = false, livePaused = false, liveInterval = 5, onToggleLiveMode, onLiveIntervalChange, defaultSearchFields = [], onSaveQuery, onLoadQuery, onShareQuery, externalQuery = '', selectedColumns = [], results = [], onExportCSV, onQueryChange, vrl, onVrlChange, vrlTime, vrlEnabled = false, filters = [], timeRange, onFiltersChange, onTimeRangeChange, onAnalyzePatterns, onRestoreHistoryState }) {
   const [query, setQuery] = useState('')
 
   // Query history management
@@ -498,12 +498,18 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
         <div className="live-mode-controls">
           <button
             type="button"
-            className={`live-mode-button ${liveMode ? 'active' : ''}`}
+            className={`live-mode-button ${liveMode ? 'active' : ''} ${livePaused ? 'paused' : ''}`}
             onClick={onToggleLiveMode}
-            title={liveMode ? 'Stop live refresh' : 'Enable live mode (auto-refresh the last 5 minutes)'}
+            title={
+              livePaused
+                ? 'Live mode paused (close the document to resume)'
+                : liveMode
+                  ? 'Stop live refresh'
+                  : 'Enable live mode (auto-refresh the last 5 minutes)'
+            }
           >
             <span className="live-mode-dot"></span>
-            Live
+            {livePaused ? 'Paused' : 'Live'}
           </button>
           {liveMode && (
             <select

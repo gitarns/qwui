@@ -363,6 +363,21 @@
   animation: live-pulse 1.2s ease-in-out infinite;
 }
 
+.live-mode-button.active.paused {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.live-mode-button.active.paused:hover {
+  background: #b45309;
+  border-color: #b45309;
+}
+
+.live-mode-button.active.paused .live-mode-dot {
+  animation: none;
+  opacity: 0.7;
+}
+
 @keyframes live-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.7); }

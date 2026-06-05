@@ -72,7 +72,7 @@ function highlightTextWithFieldTerms(text, highlightTerms, fieldName = '') {
   return highlightText(text, termsToUse)
 }
 
-function ResultsTable({ results, loading, liveMode = false, timestampField = 'timestamp', hasMoreResults = false, loadingMore = false, onLoadMore, requestTime = null, selectedColumns = [], onRemoveColumn, onFilterChange, onToggleColumn, userPreferences, darkMode = false, searchQuery = '', sortOrder = 'newest', onSortOrderChange }) {
+function ResultsTable({ results, loading, liveMode = false, onExpandedChange, timestampField = 'timestamp', hasMoreResults = false, loadingMore = false, onLoadMore, requestTime = null, selectedColumns = [], onRemoveColumn, onFilterChange, onToggleColumn, userPreferences, darkMode = false, searchQuery = '', sortOrder = 'newest', onSortOrderChange }) {
   const [expandedRows, setExpandedRows] = useState(new Set())
   const [sortBy, setSortBy] = useState({ field: null, direction: 'asc' })
   const [expandedRowTabs, setExpandedRowTabs] = useState({}) // Track active tab for each expanded row
@@ -109,6 +109,11 @@ function ResultsTable({ results, loading, liveMode = false, timestampField = 'ti
     // Log search results info
     // Results logged in SearchBar component
   }, [results, requestTime])
+
+  // Notify parent when a document is opened/closed (used to pause live mode)
+  useEffect(() => {
+    if (onExpandedChange) onExpandedChange(expandedRows.size > 0)
+  }, [expandedRows])
 
   // Handle scroll to bottom for infinite loading
   useEffect(() => {

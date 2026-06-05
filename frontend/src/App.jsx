@@ -33,6 +33,7 @@ function App() {
   const [abortController, setAbortController] = useState(null)
   const [liveMode, setLiveMode] = useState(false) // Auto-refresh mode
   const [liveInterval, setLiveInterval] = useState(5) // Refresh interval in seconds
+  const [documentOpen, setDocumentOpen] = useState(false) // A result document is expanded; pauses live refresh
   const [currentQuery, setCurrentQuery] = useState('*')
   const [filters, setFilters] = useState([])
   const filtersRef = useRef([]) // Ref to hold current filters for immediate access
@@ -2213,14 +2214,15 @@ function App() {
     })
   }
 
-  // Auto-refresh loop while live mode is active
+  // Auto-refresh loop while live mode is active.
+  // Paused (no interval) while a document is open, and resumes on close.
   useEffect(() => {
-    if (!liveMode) return
+    if (!liveMode || documentOpen) return
     const id = setInterval(() => {
       if (liveRefreshRef.current) liveRefreshRef.current()
     }, liveInterval * 1000)
     return () => clearInterval(id)
-  }, [liveMode, liveInterval])
+  }, [liveMode, liveInterval, documentOpen])
 
   const handleSetDefaultIndex = (indexId) => {
     // This is just a callback for the FieldsSidebar
@@ -2542,6 +2544,7 @@ function App() {
             requestTime={viewMode === 'visualize' ? visualizationStats.requestTime : requestTime}
             onCancelSearch={handleCancelSearch}
             liveMode={liveMode}
+            livePaused={liveMode && documentOpen}
             liveInterval={liveInterval}
             onToggleLiveMode={handleToggleLiveMode}
             onLiveIntervalChange={setLiveInterval}
@@ -2683,6 +2686,7 @@ function App() {
               results={searchResults}
               loading={loading}
               liveMode={liveMode}
+              onExpandedChange={setDocumentOpen}
               searchQuery={lastSearchQuery}
               timestampField={timestampField}
               hasMoreResults={hasMoreResults}
