@@ -45,6 +45,10 @@ resources:
 quickwit:
   url: "http://quickwit:7280"
 
+# Maximum number of documents allowed per CSV export.
+# Leave unset to use the backend default (10000).
+maxExportDocs: ""
+
 nodeSelector: {}
 
 # Extra environment variables

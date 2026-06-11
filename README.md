@@ -242,6 +242,7 @@ Only numeric fields are accepted on the Y-axis — float fields are validated vi
 |----------|---------|-------------|
 | `QUICKWIT_URL` | `http://localhost:7280` | Quickwit base URL |
 | `PORT` | `8080` | Backend listen port |
+| `MAX_EXPORT_DOCS` | `10000` | Maximum number of documents per CSV export |
 | `VITE_SAVED_QUERIES_INDEX` | `qwui` | Quickwit index used to store saved queries |
 | `OIDC_ENABLED` | `false` | Enable OIDC authentication |
 | `OIDC_CLIENT_ID` | — | OIDC client ID |

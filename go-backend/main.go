@@ -178,7 +178,7 @@ func main() {
 		Port:               getEnv("PORT", "8080"),
 		QuickwitURL:        getEnv("QUICKWIT_URL", "http://localhost:7280"),
 		QuickwitIndexerURL: getEnv("QUICKWIT_INDEXER_URL", ""),
-		MaxExportDocs:      10000,
+		MaxExportDocs:      getEnvInt("MAX_EXPORT_DOCS", 10000),
 		OIDCEnabled:   oidcEnabled,
 		OIDCClientID:  getEnv("OIDC_CLIENT_ID", ""),
 		OIDCSecret:    getEnv("OIDC_CLIENT_SECRET", ""),
@@ -1184,6 +1184,15 @@ func testQuickwitConnection() error {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			return parsed
+		}
 	}
 	return defaultValue
 }

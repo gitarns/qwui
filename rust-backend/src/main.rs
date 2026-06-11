@@ -106,7 +106,10 @@ impl Config {
             quickwit_url: env::var("QUICKWIT_URL")
                 .unwrap_or_else(|_| "http://localhost:7280".to_string()),
             quickwit_indexer_url: env::var("QUICKWIT_INDEXER_URL").ok(),
-            max_export_docs: 10000,
+            max_export_docs: env::var("MAX_EXPORT_DOCS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10000),
             oidc_enabled: env::var("OIDC_ENABLED").unwrap_or_else(|_| "false".to_string())
                 == "true",
             oidc_client_id: env::var("OIDC_CLIENT_ID").unwrap_or_default(),
