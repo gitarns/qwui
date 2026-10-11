@@ -1,4 +1,5 @@
 import './VersionNotification.css'
+import { IconSparkles } from './Icon'
 
 function VersionNotification({ show, onReload }) {
   if (!show) return null
@@ -7,7 +8,8 @@ function VersionNotification({ show, onReload }) {
     <div className="version-notification">
       <div className="version-notification-content">
         <span className="version-notification-message">
-          ✨ A new version is available
+          <IconSparkles />
+          A new version is available
         </span>
         <button className="version-notification-btn" onClick={onReload}>
           Reload

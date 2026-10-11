@@ -14,6 +14,7 @@ import {
   AreaChart
 } from 'recharts'
 import './GraphView.css'
+import { IconSettings } from './Icon'
 
 function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], timestampField = 'timestamp', numericFields = [], query = '*', histogramInterval = 'auto', onTimeRangeChange, searchTrigger = 0, onBucketTimesChange, onStatsUpdate }) {
   // Load saved graph preferences from localStorage
@@ -1454,8 +1455,9 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
             className="graph-customize-icon-btn"
             onClick={() => setShowAdvancedOptions(true)}
             title="Customize chart"
+            aria-label="Customize chart"
           >
-            ⚙️
+            <IconSettings />
           </button>
         </div>
 

@@ -9,7 +9,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',  // Proxy to Go backend
+        target: 'http://localhost:8080',  // qwui backend (make run-backend)
         changeOrigin: true,
       },
       '/login': {
@@ -25,6 +25,12 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/quickwit': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      // So an MCP client can be pointed at the dev server on 5173 like
+      // everything else, instead of needing the backend port directly.
+      '/mcp': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },

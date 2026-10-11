@@ -37,7 +37,10 @@ def setup_tracers():
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.resources import Resource
 
-    otlp_url = f"{OTLP_ENDPOINT}/api/v1/otel-traces-v0_7/otlp/v1/traces"
+    # The index-less endpoint writes to Quickwit's default traces index, whose
+    # name follows the Quickwit version (otel-traces-v0_7, otel-traces-v0_9,
+    # ...). Naming one here broke the generator on the next upgrade.
+    otlp_url = f"{OTLP_ENDPOINT}/api/v1/otlp/v1/traces"
     tracers = {}
     for svc in ["frontend", "api-gateway", "user-service", "order-service",
                 "payment-service", "db-proxy"]:

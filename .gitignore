@@ -1,3 +1,22 @@
+# Secrets / local environment
 .env
-rust-backend/target/*
+.env.local
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Frontend build output
+dist/
+frontend/dist/
+
+# Rust build artifacts
+rust-backend/target/
+
+# Compiled backend binaries
+/qwui
+/main
 go-backend/qwui
+go-backend/main
+go-backend/pattern/pattern
+*.exe

@@ -46,7 +46,7 @@
 
 .index-control:hover,
 .index-control.open {
-  border-color: #667eea;
+  border-color: var(--color-primary);
 }
 
 .index-control-value {
@@ -68,8 +68,8 @@
   align-items: center;
   gap: 2px;
   padding: 2px 6px;
-  background: rgba(102, 126, 234, 0.15);
-  border: 1px solid rgba(102, 126, 234, 0.4);
+  background: var(--color-primary-wash);
+  border: 1px solid var(--color-primary);
   border-radius: 3px;
   font-size: 0.75rem;
   line-height: 1.4;
@@ -77,7 +77,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #667eea;
+  color: var(--color-primary);
   font-weight: 500;
 }
 
@@ -110,7 +110,7 @@
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-lg);
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -151,7 +151,7 @@
 }
 
 .index-option.selected {
-  background: rgba(102, 126, 234, 0.15);
+  background: var(--color-primary-wash);
   color: var(--text-primary);
 }
 
@@ -197,16 +197,16 @@
 }
 
 .index-add-btn:hover {
-  background: #667eea;
-  color: #fff;
-  border-color: #667eea;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
 }
 
 .index-add-btn.added {
   visibility: visible;
-  background: rgba(102, 126, 234, 0.15);
-  color: #667eea;
-  border-color: #667eea;
+  background: var(--color-primary-wash);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .index-incompatible-icon {
@@ -232,10 +232,8 @@
   width: 18px;
 }
 
-.select-star-btn:hover { color: #fbbf24; transform: scale(1.2); }
-.select-star-btn.active { color: #f59e0b; }
-.dark-mode .select-star-btn.active { color: #fbbf24; }
-
+.select-star-btn:hover { color: var(--color-warning); transform: scale(1.2); }
+.select-star-btn.active { color: var(--color-warning); }
 .field-search {
   padding: 0.75rem;
   border-bottom: 1px solid var(--border-color);
@@ -245,11 +243,13 @@
 
 .search-icon {
   position: absolute;
+  display: inline-flex;
   left: 1.25rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-tertiary);
-  font-size: 0.9rem;
+  color: var(--color-text-subtle);
+  font-size: 0.875rem;
+  pointer-events: none;
 }
 
 .field-search input {
@@ -264,7 +264,7 @@
 
 .field-search input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--color-primary);
   background-color: var(--input-bg);
 }
 
@@ -389,7 +389,7 @@
 }
 
 .field-header[style*="cursor: pointer"]:hover {
-  background-color: rgba(102, 126, 234, 0.1);
+  background-color: var(--color-primary-wash);
 }
 
 .field-header.expanded {
@@ -397,16 +397,22 @@
 }
 
 .field-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--border-color);
-  color: var(--text-tertiary);
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  background-color: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-strong);
+  /* The type letter is 12px semibold on the sunken surface -- the smallest
+     text in the sidebar and the hardest thing in it to read. It was on the
+     subtle step (3.60:1 there), so it gets the muted step: 5.48:1. */
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  font-family: var(--qw-font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
   flex-shrink: 0;
 }
 
@@ -414,70 +420,92 @@
   flex: 0 1 auto;
   font-size: 0.875rem;
   color: var(--text-primary);
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.field-no-stats {
-  font-size: 0.7rem;
-  color: var(--text-tertiary);
-  margin-left: 0.25rem;
-  opacity: 0.6;
+.field-affordance {
+  display: inline-flex;
+  align-items: center;
+  /* Sits at the far end of the name, just before the column button. */
+  margin-left: auto;
+  /* Was the subtle step at opacity 0.45, which flattens to 1.73:1 in light and
+     2.04:1 in dark -- under the 3:1 floor for a meaningful icon in both. The
+     resting state now carries a real colour and hover deepens it instead. */
+  color: var(--color-text-subtle);
+  flex-shrink: 0;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.field-affordance svg {
+  width: 12px;
+  height: 12px;
+}
+
+.field-header:hover .field-affordance {
+  color: var(--color-text);
 }
 
 .field-expand-indicator {
   flex-shrink: 0;
-  font-size: 0.7rem;
-  color: var(--text-tertiary);
-  transition: color 0.15s;
+  /* Was 0.7rem = 11.2px, under the 12px floor the token scale sets, in the
+     lowest-contrast colour available. */
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  transition: color var(--dur-fast) var(--ease-out);
 }
 
 .field-header:hover .field-expand-indicator {
-  color: var(--text-tertiary);
+  color: var(--color-text);
 }
 
 .add-column-btn {
   background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 1rem;
   padding: 0;
-  width: 20px;
-  height: 20px;
-  display: flex;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
-  transition: all 0.2s;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
-  line-height: 1;
-  font-weight: 600;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
+.add-column-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* No scale() on hover: a 20px control growing by 10% jitters the row it sits in. */
 .add-column-btn:hover {
-  background-color: #006bb4;
-  border-color: #006bb4;
-  color: white;
-  transform: scale(1.1);
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .add-column-btn.selected {
-  background-color: #006bb4;
-  border-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .add-column-btn.selected:hover {
-  background-color: #ef4444;
-  border-color: #ef4444;
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .field-doc-count {
-  background-color: #667eea;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
   font-size: 0.75rem;
@@ -542,25 +570,25 @@
 }
 
 .include-btn {
-  color: #10b981;
+  color: var(--color-success);
 }
 
 .include-btn:hover {
-  background-color: #d1fae5;
-  color: #059669;
+  background-color: var(--color-success-wash);
+  color: var(--color-success);
 }
 
 .exclude-btn {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 .exclude-btn:hover {
-  background-color: #fee2e2;
-  color: #dc2626;
+  background-color: var(--color-danger-wash);
+  color: var(--color-danger);
 }
 
 .bucket-item.more-items {
-  color: #667eea;
+  color: var(--color-primary);
   font-weight: 500;
   font-style: italic;
   justify-content: center;
@@ -594,21 +622,23 @@
 }
 
 .fields-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 .fields-list::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--color-border-strong);
   border-radius: 4px;
 }
 
 .fields-list::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--color-text-subtle);
 }
 
 .field-header-main {
   display: flex;
   align-items: center;
+  /* The type badge used to sit flush against the field name. */
+  gap: var(--space-2);
   flex: 1 1 auto;      /* allow growing */
   min-width: 0;         /* needed for ellipsis inside flex */
 }
@@ -617,17 +647,17 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-muted, #888);
+  color: var(--text-muted, var(--color-text-subtle));
   padding: 6px 12px 4px;
 }
 
 .popular-field-item {
-  background: var(--popular-bg, rgba(102, 126, 234, 0.04));
+  background: var(--popular-bg, var(--color-primary-wash));
 }
 
 .popular-section-divider {
   height: 1px;
-  background: var(--border-color, #e0e0e0);
+  background: var(--border-color, var(--color-border));
   margin: 6px 0 4px;
 }
 
@@ -651,9 +681,9 @@
 }
 
 .view-values-btn:hover {
-  background-color: #667eea;
-  border-color: #667eea;
-  color: white;
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 /* Values Popover */
@@ -662,7 +692,7 @@
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
   z-index: 301;
   width: 380px;
   max-height: 50vh;
@@ -748,7 +778,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
 }
 
 .popover-bucket-count {
@@ -787,24 +817,29 @@
   background-color: var(--border-color);
 }
 
+.popover-filter-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .popover-include-btn {
-  color: #10b981;
+  color: var(--color-text-muted);
 }
 
 .popover-include-btn:hover {
-  background-color: #d1fae5;
-  color: #059669;
-  border-color: #10b981;
+  background-color: var(--color-success-wash);
+  color: var(--color-success);
+  border-color: var(--color-success);
 }
 
 .popover-exclude-btn {
-  color: #ef4444;
+  color: var(--color-text-muted);
 }
 
 .popover-exclude-btn:hover {
-  background-color: #fee2e2;
-  color: #dc2626;
-  border-color: #ef4444;
+  background-color: var(--color-danger-wash);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 /* Loading state */
@@ -842,7 +877,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid var(--border-color);
-  border-top-color: var(--primary-color, #667eea);
+  border-top-color: var(--primary-color, var(--color-primary));
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

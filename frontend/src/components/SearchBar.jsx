@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import './SearchBar.css'
+import {
+  IconFolderOpen,
+  IconSave,
+  IconLink,
+  IconBookOpen,
+  IconDownload,
+} from './Icon'
 
 function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIndex, onFetchFieldValues, firstEventTime, lastEventTime, histogramInterval, onHistogramIntervalChange, intervalError, totalHits, elapsedTimeMicros, requestTime, onCancelSearch, liveMode = false, livePaused = false, liveInterval = 5, onToggleLiveMode, onLiveIntervalChange, defaultSearchFields = [], onSaveQuery, onLoadQuery, onShareQuery, externalQuery = '', selectedColumns = [], results = [], onExportCSV, onQueryChange, vrl, onVrlChange, vrlTime, vrlEnabled = false, filters = [], timeRange, onFiltersChange, onTimeRangeChange, onAnalyzePatterns, onRestoreHistoryState }) {
   const [query, setQuery] = useState('')
@@ -49,6 +56,7 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
   const [suggestionType, setSuggestionType] = useState('field') // 'field' or 'value'
   const [currentField, setCurrentField] = useState('')
   const inputRef = useRef(null)
+  const inputGroupRef = useRef(null)
   const suggestionsRef = useRef(null)
 
   // Auto-resize textarea when query changes
@@ -58,6 +66,25 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
     el.style.height = 'auto'
     el.style.height = el.scrollHeight + 'px'
   }, [query])
+
+  // ...and when its width changes: the search bar wraps onto two rows on narrow
+  // screens, and a query that needed three lines at one width needs one at the
+  // other. Watches the group, not the textarea, so setting the height here
+  // cannot feed back into the observer.
+  useEffect(() => {
+    const group = inputGroupRef.current
+    const el = inputRef.current
+    if (!group || !el || typeof ResizeObserver === 'undefined') return
+    let lastWidth = group.clientWidth
+    const observer = new ResizeObserver(() => {
+      if (group.clientWidth === lastWidth) return
+      lastWidth = group.clientWidth
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
+    })
+    observer.observe(group)
+    return () => observer.disconnect()
+  }, [])
   const infoIconRef = useRef(null)
   const [tooltipStyle, setTooltipStyle] = useState({})
 
@@ -377,152 +404,164 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
               ▶
             </button>
           </div>
-          <textarea
-            ref={inputRef}
-            value={query}
-            onChange={handleQueryChange}
-            onKeyDown={handleKeyDown}
-            placeholder=""
-            className="search-input"
-            disabled={loading}
-            rows={1}
-          />
-          <div className="search-actions">
-            {vrlEnabled && (
+          {/* The actions sit beside the textarea in one bordered group, not
+              overlaid on it: an overlay has to reserve its width as padding,
+              which left a laptop-width screen a few characters to type in. */}
+          <div ref={inputGroupRef} className={`search-input-group ${loading ? 'is-disabled' : ''}`}>
+            <textarea
+              ref={inputRef}
+              value={query}
+              onChange={handleQueryChange}
+              onKeyDown={handleKeyDown}
+              placeholder=""
+              className="search-input"
+              disabled={loading}
+              rows={1}
+            />
+            {query && (
               <button
+                className="clear-search-button"
+                onClick={handleClear}
                 type="button"
-                className={`query-action-btn function-btn ${vrl ? 'active' : ''} `}
-                onClick={() => setShowVrlInput(!showVrlInput)}
-                title={vrl ? "Edit VRL Function" : "Add VRL Function"}
-                disabled={loading}
+                title="Clear search"
               >
-                ƒ
+                ×
               </button>
             )}
-            <button
-              type="button"
-              className="query-action-btn load-btn"
-              onClick={onLoadQuery}
-              title="Load saved query"
-              disabled={loading}
-            >
-              📂
-            </button>
-            <button
-              type="button"
-              className="query-action-btn save-btn"
-              onClick={() => onSaveQuery(query)}
-              title="Save current query"
-              disabled={loading}
-            >
-              💾
-            </button>
-            <button
-              type="button"
-              className="query-action-btn share-btn"
-              onClick={onShareQuery}
-              title="Share query link"
-              disabled={loading}
-            >
-              🔗
-            </button>
-            <button
-              type="button"
-              className="query-action-btn patterns-btn"
-              onClick={onAnalyzePatterns}
-              title="Analyze log patterns"
-              disabled={loading || !selectedIndex}
-            >
-              ∿
-            </button>
-            {defaultSearchFields.length > 0 && (
-              <div
-                className="search-info-icon"
-                onMouseEnter={() => setTooltipStyle({ display: 'block' })}
-                onMouseLeave={() => setTooltipStyle({ display: 'none' })}
+            <div className="search-actions">
+              {vrlEnabled && (
+                <button
+                  type="button"
+                  className={`query-action-btn function-btn ${vrl ? 'active' : ''} `}
+                  onClick={() => setShowVrlInput(!showVrlInput)}
+                  title={vrl ? "Edit VRL Function" : "Add VRL Function"}
+                  disabled={loading}
+                >
+                  ƒ
+                </button>
+              )}
+              <button
+                type="button"
+                className="query-action-btn load-btn"
+                onClick={onLoadQuery}
+                title="Load saved query"
+                aria-label="Load saved query"
+                disabled={loading}
               >
-                ℹ️
-                <div className="search-info-tooltip" style={tooltipStyle}>
-                  <div className="tooltip-title">Default Search Fields:</div>
-                  <ul className="tooltip-fields-list">
-                    {defaultSearchFields.map(field => (
-                      <li key={field}>{field}</li>
-                    ))}
-                  </ul>
+                <IconFolderOpen />
+              </button>
+              <button
+                type="button"
+                className="query-action-btn save-btn"
+                onClick={() => onSaveQuery(query)}
+                title="Save current query"
+                aria-label="Save current query"
+                disabled={loading}
+              >
+                <IconSave />
+              </button>
+              <button
+                type="button"
+                className="query-action-btn share-btn"
+                onClick={onShareQuery}
+                title="Share query link"
+                aria-label="Share query link"
+                disabled={loading}
+              >
+                <IconLink />
+              </button>
+              <button
+                type="button"
+                className="query-action-btn patterns-btn"
+                onClick={onAnalyzePatterns}
+                title="Analyze log patterns"
+                disabled={loading || !selectedIndex}
+              >
+                ∿
+              </button>
+              {defaultSearchFields.length > 0 && (
+                <div
+                  className="search-info-icon"
+                  onMouseEnter={() => setTooltipStyle({ display: 'block' })}
+                  onMouseLeave={() => setTooltipStyle({ display: 'none' })}
+                >
+                  ℹ️
+                  <div className="search-info-tooltip" style={tooltipStyle}>
+                    <div className="tooltip-title">Default Search Fields:</div>
+                    <ul className="tooltip-fields-list">
+                      {defaultSearchFields.map(field => (
+                        <li key={field}>{field}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
+              )}
+            </div>
+            {showSuggestions && suggestions.length > 0 && (
+              <div ref={suggestionsRef} className="search-suggestions">
+                {suggestions.map((suggestion, index) => (
+                  <div
+                    key={suggestion}
+                    className={`suggestion-item ${index === selectedSuggestionIndex ? 'selected' : ''}`}
+                    onClick={() => insertSuggestion(suggestion)}
+                    onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                    ref={index === selectedSuggestionIndex ? el => el?.scrollIntoView({ block: 'nearest' }) : null}
+                  >
+                    {suggestion}
+                  </div>
+                ))}
               </div>
             )}
           </div>
-          {query && (
-            <button
-              className="clear-search-button"
-              onClick={handleClear}
-              type="button"
-              title="Clear search"
-            >
-              ×
-            </button>
-          )}
-          {showSuggestions && suggestions.length > 0 && (
-            <div ref={suggestionsRef} className="search-suggestions">
-              {suggestions.map((suggestion, index) => (
-                <div
-                  key={suggestion}
-                  className={`suggestion-item ${index === selectedSuggestionIndex ? 'selected' : ''}`}
-                  onClick={() => insertSuggestion(suggestion)}
-                  onMouseEnter={() => setSelectedSuggestionIndex(index)}
-                  ref={index === selectedSuggestionIndex ? el => el?.scrollIntoView({ block: 'nearest' }) : null}
-                >
-                  {suggestion}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-        {timeRangePicker}
-        <button
-          type="button"
-          className={`search-button ${loading && !liveMode ? 'loading' : ''} `}
-          onClick={loading ? onCancelSearch : handleSubmit}
-          disabled={liveMode}
-        >
-          {loading && !liveMode ? (
-            <>
-              <span className="loading-spinner"></span>
-              Cancel
-            </>
-          ) : (
-            'Search'
-          )}
-        </button>
-        <div className="live-mode-controls">
+        {/* Wraps as one block, so a narrow screen moves all of it under
+            the query rather than stranding a single button on a row. */}
+        <div className="search-controls">
+          {timeRangePicker}
           <button
             type="button"
-            className={`live-mode-button ${liveMode ? 'active' : ''} ${livePaused ? 'paused' : ''}`}
-            onClick={onToggleLiveMode}
-            title={
-              livePaused
-                ? 'Live mode paused (close the document to resume)'
-                : liveMode
-                  ? 'Stop live refresh'
-                  : 'Enable live mode (auto-refresh the last 5 minutes)'
-            }
+            className={`search-button ${loading && !liveMode ? 'loading' : ''} `}
+            onClick={loading ? onCancelSearch : handleSubmit}
+            disabled={liveMode}
           >
-            <span className="live-mode-dot"></span>
-            {livePaused ? 'Paused' : 'Live'}
+            {loading && !liveMode ? (
+              <>
+                <span className="loading-spinner"></span>
+                Cancel
+              </>
+            ) : (
+              'Search'
+            )}
           </button>
-          {liveMode && (
-            <select
-              className="live-interval-select"
-              value={liveInterval}
-              onChange={(e) => onLiveIntervalChange(Number(e.target.value))}
-              title="Refresh interval"
+          <div className="live-mode-controls">
+            <button
+              type="button"
+              className={`live-mode-button ${liveMode ? 'active' : ''} ${livePaused ? 'paused' : ''}`}
+              onClick={onToggleLiveMode}
+              title={
+                livePaused
+                  ? 'Live mode paused (close the document to resume)'
+                  : liveMode
+                    ? 'Stop live refresh'
+                    : 'Enable live mode (auto-refresh the last 5 minutes)'
+              }
             >
-              <option value={5}>5s</option>
-              <option value={15}>15s</option>
-              <option value={60}>1m</option>
-            </select>
-          )}
+              <span className="live-mode-dot"></span>
+              {livePaused ? 'Paused' : 'Live'}
+            </button>
+            {liveMode && (
+              <select
+                className="live-interval-select"
+                value={liveInterval}
+                onChange={(e) => onLiveIntervalChange(Number(e.target.value))}
+                title="Refresh interval"
+              >
+                <option value={5}>5s</option>
+                <option value={15}>15s</option>
+                <option value={60}>1m</option>
+              </select>
+            )}
+          </div>
         </div>
       </div>
 
@@ -577,7 +616,8 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
           className="query-docs-link"
           title="Open Quickwit query language documentation"
         >
-          📖 Query Syntax
+          <IconBookOpen />
+          Query Syntax
         </a>
 
         {timeRange && timeRange.from && timeRange.to && (
@@ -672,7 +712,8 @@ function SearchBar({ onSearch, loading, timeRangePicker, fields = [], selectedIn
                 disabled={!results || results.length === 0}
                 title="Export results to CSV"
               >
-                📥 Export CSV
+                <IconDownload />
+                Export CSV
               </button>
             )}
           </>

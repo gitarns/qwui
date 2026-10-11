@@ -39,6 +39,9 @@ use vrl::compiler::{state::RuntimeState, Context, TimeZone};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 
+mod mcp;
+mod metrics;
+
 /// StateStore manages OIDC state tokens with expiration
 #[derive(Clone)]
 struct StateStore {
@@ -81,6 +84,9 @@ struct AppState {
     config: Config,
     client: ReqwestClient,
     oidc_client: Option<CoreClient>,
+    // RP-initiated logout endpoint, discovered at startup. None when the
+    // provider does not advertise one.
+    oidc_end_session: Option<String>,
     state_store: StateStore,
 }
 
@@ -95,7 +101,11 @@ struct Config {
     oidc_secret: String,
     oidc_issuer: String,
     oidc_redirect: String,
+    oidc_post_logout: String,
     session_secret: Option<String>,
+    // Whether the session cookie carries the `Secure` attribute. Inferred from
+    // the OIDC redirect URL's scheme, overridable with SESSION_COOKIE_SECURE.
+    session_cookie_secure: bool,
     _origin: String,
 }
 
@@ -116,7 +126,16 @@ impl Config {
             oidc_secret: env::var("OIDC_CLIENT_SECRET").unwrap_or_default(),
             oidc_issuer: env::var("OIDC_ISSUER").unwrap_or_default(),
             oidc_redirect: env::var("OIDC_REDIRECT_URL").unwrap_or_default(),
+            oidc_post_logout: env::var("OIDC_POST_LOGOUT_REDIRECT_URL").unwrap_or_default(),
             session_secret: env::var("SESSION_SECRET").ok(),
+            session_cookie_secure: match env::var("SESSION_COOKIE_SECURE") {
+                Ok(v) => v == "true",
+                // No explicit setting: HTTPS deployments get `Secure`, local
+                // HTTP development does not (where it would break the cookie).
+                Err(_) => env::var("OIDC_REDIRECT_URL")
+                    .unwrap_or_default()
+                    .starts_with("https://"),
+            },
             _origin: env::var("ORIGIN").unwrap_or_else(|_| "*".to_string()),
         };
 
@@ -138,14 +157,77 @@ struct User {
     sub: String,
 }
 
-// Middleware to add cache headers for static files
+// Middleware to add cache headers.
+//
+// Deny-by-default: only provably immutable assets get a long cache, everything
+// else is `no-store`. The auth routes must never be cached at all -- the /login
+// redirect carries a single-use OAuth2 `state`, so a cached copy replays a state
+// that is already spent and login becomes permanently impossible.
 async fn cache_control_middleware(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
     let mut response = next.run(req).await;
 
-    // Set cache headers based on file type
-    if path.ends_with(".html") || path == "/" {
-        // HTML files: no cache (always fetch fresh)
+    // Auth and session routes: single-use OAuth2 state, or per-user data that a
+    // shared cache must never hand to somebody else.
+    let is_auth_route = matches!(
+        path.as_str(),
+        "/login"
+            | "/logout"
+            | "/auth/callback"
+            | "/api/auth/status"
+            | "/api/user-info"
+            // Bare forms, in case these ever stop being nested under /api.
+            | "/auth/status"
+            | "/user-info"
+    );
+
+    // Fingerprinted build output: the filename changes when the bytes change.
+    let is_immutable_asset = path.contains("/assets/")
+        || path.ends_with(".js")
+        || path.ends_with(".css")
+        || path.ends_with(".woff")
+        || path.ends_with(".woff2")
+        || path.ends_with(".ttf");
+
+    // Unfingerprinted static media (favicons, logo). Not sensitive, and worth a
+    // moderate cache, but they can change in place so no `immutable`.
+    let is_static_media = path.ends_with(".png")
+        || path.ends_with(".jpg")
+        || path.ends_with(".jpeg")
+        || path.ends_with(".gif")
+        || path.ends_with(".svg")
+        || path.ends_with(".ico")
+        || path.ends_with(".webp");
+
+    if is_auth_route {
+        // `no-store`, not `no-cache`: no-cache still permits storing the
+        // response and revalidating it. A one-shot state must not be written to
+        // any cache, shared or private.
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        );
+        response.headers_mut().insert(
+            header::PRAGMA,
+            HeaderValue::from_static("no-cache"),
+        );
+        response.headers_mut().insert(
+            header::EXPIRES,
+            HeaderValue::from_static("0"),
+        );
+    } else if is_immutable_asset {
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=31536000, immutable"),
+        );
+    } else if is_static_media {
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=86400"),
+        );
+    } else {
+        // Everything else: HTML, the API, the Quickwit proxy, and any route
+        // added later. Dynamic until proven otherwise.
         response.headers_mut().insert(
             header::CACHE_CONTROL,
             HeaderValue::from_static("no-cache, no-store, must-revalidate"),
@@ -157,18 +239,6 @@ async fn cache_control_middleware(req: Request, next: Next) -> Response {
         response.headers_mut().insert(
             header::EXPIRES,
             HeaderValue::from_static("0"),
-        );
-    } else if path.contains("/assets/") || path.ends_with(".js") || path.ends_with(".css") || path.ends_with(".woff") || path.ends_with(".woff2") || path.ends_with(".ttf") {
-        // Hashed assets (JS, CSS, fonts): long cache (1 year)
-        response.headers_mut().insert(
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("public, max-age=31536000, immutable"),
-        );
-    } else {
-        // Other files: moderate cache (1 day)
-        response.headers_mut().insert(
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("public, max-age=86400"),
         );
     }
 
@@ -214,7 +284,7 @@ async fn main() -> Result<()> {
 
     let client = ReqwestClient::builder()
         .timeout(Duration::from_secs(300))
-        .pool_max_idle_per_host(0)
+        .pool_max_idle_per_host(0) // disable connection reuse for load balancing across pods
         .build()?;
 
     // Test Quickwit connection
@@ -237,6 +307,7 @@ async fn main() -> Result<()> {
     }
 
     let mut oidc_client = None;
+    let mut oidc_end_session: Option<String> = None;
     if config.oidc_enabled {
         if config.oidc_client_id.is_empty()
             || config.oidc_secret.is_empty()
@@ -260,12 +331,44 @@ async fn main() -> Result<()> {
             )
             .set_redirect_uri(RedirectUrl::new(config.oidc_redirect.clone())?),
         );
+
+        // openidconnect's CoreProviderMetadata does not surface
+        // end_session_endpoint, so read it straight from the discovery
+        // document. Optional: providers without it fall back to a local-only
+        // session clear at logout.
+        let discovery_url = format!(
+            "{}/.well-known/openid-configuration",
+            config.oidc_issuer.trim_end_matches('/')
+        );
+        oidc_end_session = match client.get(&discovery_url).send().await {
+            Ok(resp) => match resp.json::<Value>().await {
+                Ok(doc) => doc
+                    .get("end_session_endpoint")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                Err(e) => {
+                    error!("Could not parse OIDC discovery document: {}", e);
+                    None
+                }
+            },
+            Err(e) => {
+                error!("Could not fetch OIDC discovery document: {}", e);
+                None
+            }
+        };
+        match &oidc_end_session {
+            Some(url) => info!("RP-initiated logout available: {}", url),
+            None => error!(
+                "Provider advertises no end_session_endpoint: logout will only clear the local session, the provider SSO session will survive"
+            ),
+        }
     }
 
     let state = AppState {
         config: config.clone(),
         client,
         oidc_client,
+        oidc_end_session,
         state_store: StateStore::new(),
     };
 
@@ -282,7 +385,7 @@ async fn main() -> Result<()> {
     };
 
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_secure(false) // Set to true in production with HTTPS
+        .with_secure(config.session_cookie_secure)
         .with_same_site(tower_sessions::cookie::SameSite::Lax)
         .with_expiry(Expiry::OnInactivity(time::Duration::days(7)));
 
@@ -295,11 +398,11 @@ async fn main() -> Result<()> {
     let mut connector = HttpConnector::new();
     connector.set_nodelay(true);
     connector.enforce_http(false);
-    connector.set_keepalive(Some(std::time::Duration::from_secs(60)));
+    connector.set_keepalive(None); // disable TCP keep-alive for load balancing across pods
 
     let client = Client::builder(hyper_util::rt::TokioExecutor::new())
-        .pool_idle_timeout(std::time::Duration::from_secs(60))
-        .pool_max_idle_per_host(32)
+        .pool_idle_timeout(std::time::Duration::ZERO)
+        .pool_max_idle_per_host(0) // disable connection reuse for load balancing across pods
         .build(connector);
     let proxy = ReverseProxy::new_with_client("/", &state.config.quickwit_url, client);
     let protected_reverse_proxy: Router = proxy.into();
@@ -328,7 +431,12 @@ async fn main() -> Result<()> {
         .route("/logout", get(logout_handler))
         .with_state(state.clone());
 
-    let app = Router::new()
+    // MCP is deliberately NOT wrapped in auth_middleware: an agent cannot
+    // complete an interactive OIDC login, so /mcp carries its own bearer
+    // credential (see mcp::require_token). None when disabled or unconfigured.
+    let mcp_routes = mcp::router(&state).await;
+
+    let mut routes = Router::new()
         .nest("/api", api_routes)
         .nest(
             "/quickwit",
@@ -343,7 +451,48 @@ async fn main() -> Result<()> {
                     auth_middleware,
                 ))),
         )
-        .merge(auth_routes)
+        .merge(auth_routes);
+
+    // Nested before the layer chain below, so /mcp picks up cache-control and
+    // request tracing like every other route. A `.layer()` only applies to the
+    // routes registered before it, so mounting afterwards would silently opt
+    // MCP out of all of them.
+    if let Some(mcp_routes) = mcp_routes {
+        routes = routes.nest("/mcp", mcp_routes);
+    }
+
+    // Prometheus scrape target, off unless asked for.
+    //
+    // Unauthenticated by design, the way an exporter is, so that an in-cluster
+    // Prometheus can scrape it without a credential. That makes it a footgun
+    // behind a catch-all ingress: one that routes "/" as a Prefix makes an
+    // always-on /metrics reachable from the internet. It carries no query text
+    // and no credentials, but it does
+    // name the configured agents, so it is opt-in and the log says to restrict
+    // it at the ingress.
+    let routes = if env::var("METRICS_ENABLED").unwrap_or_else(|_| "false".into()) == "true" {
+        info!(
+            "Metrics enabled at /metrics -- unauthenticated by design; block this path at \
+             the ingress if it is publicly routed"
+        );
+        routes.route(
+            "/metrics",
+            get(|| async {
+                (
+                    [(
+                        axum::http::header::CONTENT_TYPE,
+                        "text/plain; version=0.0.4",
+                    )],
+                    metrics::render(),
+                )
+            }),
+        )
+    } else {
+        info!("Metrics disabled (set METRICS_ENABLED=true to serve /metrics)");
+        routes
+    };
+
+    let app = routes
         .fallback_service(ServeDir::new("dist"))
         .layer(middleware::from_fn(cache_control_middleware))
         .layer(session_layer)
@@ -374,7 +523,46 @@ async fn main() -> Result<()> {
 
 // Auth Handlers
 
-async fn login_handler(State(app_state): State<AppState>, session: Session) -> impl IntoResponse {
+/// Session key for the page to land on once the OIDC login completes.
+const POST_LOGIN_REDIRECT_KEY: &str = "post_login_redirect";
+
+/// Longest `return_to` kept. A search link carrying filters runs to a few KB;
+/// the cap stops a crafted link parking an arbitrary value in the in-memory
+/// session store.
+const MAX_RETURN_PATH_LEN: usize = 8192;
+
+#[derive(Deserialize)]
+struct LoginParams {
+    /// The page the browser was on when it was sent to log in, so a shared
+    /// search link survives the round trip through the identity provider.
+    return_to: Option<String>,
+}
+
+/// `candidate` if it is a path on this site, otherwise None. Anything a
+/// browser could read as another origin is refused rather than repaired:
+/// `//evil.example` and `/\evil.example` are protocol-relative to browsers,
+/// and browsers drop tabs and newlines from URLs, so `/\t/evil.example` turns
+/// into `//evil.example`. ASCII only, as the frontend sends it percent-encoded,
+/// which also keeps it a valid Location header.
+fn safe_return_path(candidate: &str) -> Option<&str> {
+    let path = candidate.split(['?', '#']).next().unwrap_or_default();
+    if candidate.len() > MAX_RETURN_PATH_LEN
+        || !candidate.is_ascii()
+        || !candidate.starts_with('/')
+        || candidate.starts_with("//")
+        || path.contains('\\')
+        || candidate.chars().any(|c| c.is_ascii_control())
+    {
+        return None;
+    }
+    Some(candidate)
+}
+
+async fn login_handler(
+    State(app_state): State<AppState>,
+    session: Session,
+    Query(params): Query<LoginParams>,
+) -> impl IntoResponse {
     let client = match app_state.oidc_client {
         Some(c) => c,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "OIDC not enabled").into_response(),
@@ -397,6 +585,18 @@ async fn login_handler(State(app_state): State<AppState>, session: Session) -> i
 
     // Store nonce in session (still needed for ID token validation)
     session.insert("oidc_nonce", nonce.secret()).await.unwrap();
+
+    // Cleared when absent, so an abandoned earlier login cannot send this one
+    // somewhere stale.
+    match params.return_to.as_deref().and_then(safe_return_path) {
+        Some(path) => session.insert(POST_LOGIN_REDIRECT_KEY, path).await.unwrap(),
+        None => {
+            session
+                .remove::<String>(POST_LOGIN_REDIRECT_KEY)
+                .await
+                .unwrap();
+        }
+    }
 
     Redirect::to(auth_url.as_str()).into_response()
 }
@@ -472,14 +672,69 @@ async fn auth_callback(
 
     info!("User logged in: {} ({})", user.name, user.email);
     session.insert("user", user).await.unwrap();
+    // Kept so /logout can pass it as id_token_hint to the provider.
+    session
+        .insert("id_token", id_token.to_string())
+        .await
+        .unwrap();
     session.remove::<String>("oidc_nonce").await.unwrap();
 
-    Redirect::to("/").into_response()
+    // Checked again on the way out: it came from a query string, and this is
+    // where it becomes a redirect.
+    let return_to = session
+        .remove::<String>(POST_LOGIN_REDIRECT_KEY)
+        .await
+        .unwrap()
+        .filter(|path| safe_return_path(path).is_some())
+        .unwrap_or_else(|| "/".to_string());
+
+    Redirect::to(&return_to).into_response()
 }
 
-async fn logout_handler(session: Session) -> impl IntoResponse {
-    session.clear().await;
-    Redirect::to("/")
+async fn logout_handler(
+    State(app_state): State<AppState>,
+    session: Session,
+) -> impl IntoResponse {
+    // Read the ID token before wiping the session: the provider needs it as
+    // id_token_hint to know which session to end.
+    let id_token: Option<String> = session.get("id_token").await.unwrap_or(None);
+
+    // flush() drops the session from the store and expires the cookie;
+    // clear() alone would leave an empty but valid session behind.
+    if let Err(e) = session.flush().await {
+        error!("Failed to flush session during logout: {}", e);
+    }
+
+    // Clearing our cookie is not a logout: the provider keeps its own SSO
+    // session, so the next /login would silently re-authenticate. Hand the
+    // user to the provider so it ends its session too.
+    let end_session = match &app_state.oidc_end_session {
+        Some(e) => e,
+        None => return Redirect::to("/").into_response(),
+    };
+
+    let mut url = match reqwest::Url::parse(end_session) {
+        Ok(u) => u,
+        Err(e) => {
+            error!("Invalid end_session_endpoint {}: {}", end_session, e);
+            return Redirect::to("/").into_response();
+        }
+    };
+    {
+        let mut q = url.query_pairs_mut();
+        if let Some(token) = &id_token {
+            q.append_pair("id_token_hint", token);
+        }
+        q.append_pair("client_id", &app_state.config.oidc_client_id);
+        if !app_state.config.oidc_post_logout.is_empty() {
+            q.append_pair(
+                "post_logout_redirect_uri",
+                &app_state.config.oidc_post_logout,
+            );
+        }
+    }
+
+    Redirect::to(url.as_str()).into_response()
 }
 
 async fn auth_status(State(state): State<AppState>, session: Session) -> impl IntoResponse {
@@ -491,14 +746,14 @@ async fn auth_status(State(state): State<AppState>, session: Session) -> impl In
             "oidc_enabled": true,
             "authenticated": authenticated,
             "user": user.map(|u| serde_json::json!({ "email": u.email, "name": u.name })),
-            "features": { "vrl": true }
+            "features": { "vrl": true, "mcp": mcp::enabled() }
         })
     } else {
         serde_json::json!({
             "oidc_enabled": false,
             "authenticated": true,
             "user": { "name": "Anonymous User", "email": "anonymous@local" },
-            "features": { "vrl": true }
+            "features": { "vrl": true, "mcp": mcp::enabled() }
         })
     };
 
@@ -1241,4 +1496,40 @@ async fn smart_proxy_middleware(
     }
 
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn return_path_keeps_a_search_link() {
+        let link = "/?index=logs&query=level:error&from=now-15m&to=now&filters=%5B%5D";
+        assert_eq!(safe_return_path(link), Some(link));
+        assert_eq!(safe_return_path("/"), Some("/"));
+        // A backslash in the query string is data, not a path separator.
+        assert_eq!(safe_return_path(r"/?query=a\b"), Some(r"/?query=a\b"));
+    }
+
+    #[test]
+    fn return_path_refuses_other_origins() {
+        for hostile in [
+            "https://evil.example/",
+            "//evil.example",
+            r"/\evil.example",
+            "/\t/evil.example",
+            "/\n/evil.example",
+            "evil.example",
+            "",
+            "/caf\u{e9}",
+        ] {
+            assert_eq!(safe_return_path(hostile), None, "accepted {hostile:?}");
+        }
+    }
+
+    #[test]
+    fn return_path_is_capped() {
+        let long = format!("/?query={}", "a".repeat(MAX_RETURN_PATH_LEN));
+        assert_eq!(safe_return_path(&long), None);
+    }
 }

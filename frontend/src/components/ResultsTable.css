@@ -46,8 +46,8 @@
 
 .results-list-header {
   display: grid;
-  grid-template-columns: auto 200px 1fr;
-  gap: 1rem;
+  grid-template-columns: auto max-content 1fr;
+  gap: var(--space-5);
   padding: 0.1rem 1rem;
   background-color: var(--bg-tertiary);
   border-bottom: 2px solid var(--border-color);
@@ -80,11 +80,6 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-}
-
-.dark-mode .results-list-header {
-  background-color: #1f1f1f;
-  border-bottom-color: #555555;
 }
 
 .header-column {
@@ -128,8 +123,8 @@
 }
 
 .sort-column-btn:hover {
-  background-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
   opacity: 1;
 }
 
@@ -151,14 +146,14 @@
 }
 
 .sort-order-btn:hover {
-  background-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
   opacity: 1;
 }
 
 .sort-column-btn.active {
-  background-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
   opacity: 1;
 }
 
@@ -181,8 +176,8 @@
 }
 
 .remove-column-btn:hover {
-  background-color: #ef4444;
-  color: white;
+  background-color: var(--color-danger);
+  color: var(--color-text-on-accent);
   opacity: 1;
 }
 
@@ -200,7 +195,7 @@
   word-wrap: break-word;
   word-break: break-word;
   white-space: pre-wrap;
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
   flex: 1;
   min-width: 0;
 }
@@ -236,23 +231,23 @@
 }
 
 .column-filter-btn.filter-in {
-  color: #10b981;
+  color: var(--color-success);
 }
 
 .column-filter-btn.filter-in:hover {
-  background-color: #d1fae5;
-  border-color: #10b981;
-  color: #059669;
+  background-color: var(--color-success-wash);
+  border-color: var(--color-success);
+  color: var(--color-success);
 }
 
 .column-filter-btn.filter-out {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 .column-filter-btn.filter-out:hover {
-  background-color: #fee2e2;
-  border-color: #ef4444;
-  color: #dc2626;
+  background-color: var(--color-danger-wash);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 .result-item {
@@ -268,8 +263,8 @@
   padding: 0.75rem 1rem;
   cursor: pointer;
   display: grid;
-  grid-template-columns: auto 200px 1fr;
-  gap: 1rem;
+  grid-template-columns: auto max-content 1fr;
+  gap: var(--space-5);
   align-items: start;
 }
 
@@ -290,8 +285,8 @@
 }
 
 .result-timestamp {
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-  color: var(--text-secondary);
+  font-family: var(--qw-font-mono);
+  color: var(--color-text-muted);
   white-space: nowrap;
   font-weight: 500;
 }
@@ -306,7 +301,7 @@
 .result-json-preview {
   margin: 0;
   padding: 0;
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
   line-height: 1.5;
   color: var(--text-primary);
   white-space: pre-wrap;
@@ -321,17 +316,14 @@
 }
 
 .field-name-badge {
-  background-color: #dbeafe; /* Light blue for light mode */
+  background-color: var(--color-primary-wash);
+  color: var(--color-info);
   padding: 0.125rem 0.375rem;
   border-radius: 3px;
   font-weight: 600;
   margin-right: 0.25rem;
 }
 
-.dark-mode .field-name-badge {
-  background-color: #7f1d1d; /* Light red for dark mode */
-  color: #fca5a5;
-}
 
 .field-value-text {
   margin-right: 0.5rem;
@@ -358,18 +350,18 @@
 }
 
 .result-key {
-  color: var(--text-tertiary);
+  color: var(--color-text-muted);
   font-weight: 600;
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
 }
 
 .result-value {
   color: var(--text-primary);
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
 }
 
 .result-more {
-  color: var(--text-tertiary);
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
@@ -413,13 +405,8 @@
 }
 
 .tab-button.active {
-  color: #006bb4;
-  border-bottom-color: #006bb4;
-}
-
-.dark-mode .tab-button.active {
-  color: #60a5fa;
-  border-bottom-color: #60a5fa;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 .tab-content {
@@ -432,10 +419,13 @@
 
 .copy-json-btn {
   position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   top: 0.5rem;
   right: 0.5rem;
-  background-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
   border: none;
   border-radius: 4px;
   padding: 0.5rem 1rem;
@@ -444,26 +434,17 @@
   cursor: pointer;
   transition: all 0.2s;
   z-index: 10;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .copy-json-btn:hover {
-  background-color: #005a9e;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  background-color: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .copy-json-btn:active {
   transform: translateY(1px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.dark-mode .copy-json-btn {
-  background-color: #60a5fa;
-  color: #1a1a1a;
-}
-
-.dark-mode .copy-json-btn:hover {
-  background-color: #3b82f6;
+  box-shadow: var(--shadow-sm);
 }
 
 .json-view {
@@ -473,19 +454,14 @@
   padding: 1rem;
   padding-top: 3rem; /* Make room for the copy button */
   overflow-x: auto;
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-}
-
-.dark-mode .json-view {
-  background-color: #1a1a1a;
-  border-color: #444;
+  font-family: var(--qw-font-mono);
 }
 
 /* Override react-json-view default styles */
 .json-view .react-json-view {
   background-color: transparent !important;
   padding: 0 !important;
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace !important;
+  font-family: var(--qw-font-mono) !important;
 }
 
 .details-table {
@@ -514,16 +490,6 @@
   letter-spacing: 0.05em;
 }
 
-.dark-mode .result-table thead tr {
-  background-color: #2d2d2d;
-  border-top-color: #555555;
-  border-bottom-color: #555555;
-}
-
-.dark-mode .result-table th {
-  color: var(--text-tertiary);
-}
-
 .result-table tbody tr {
   border-bottom: 1px solid var(--border-color);
 }
@@ -536,10 +502,6 @@
   background-color: var(--bg-tertiary);
 }
 
-.dark-mode .result-table tbody tr {
-  background-color: #262626;
-  border-bottom-color: #555555;
-}
 
 .result-table td {
   padding: 0.625rem 0.75rem;
@@ -565,7 +527,7 @@
   width: 180px;
   min-width: 180px;
   background-color: var(--bg-tertiary);
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
 }
 
 .details-table .field-value {
@@ -575,7 +537,7 @@
 
 .details-table .field-value pre {
   margin: 0;
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
   font-size: 0.8125rem;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -605,40 +567,49 @@
 
 .action-btn {
   background: none;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 1rem;
   padding: 0;
   width: 24px;
   height: 24px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
-  transition: all 0.2s;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
-  line-height: 1;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
+.action-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Neutral until hovered. Painting them green and red at rest turned every
+   expanded row into a traffic light, and colour was the only thing telling the
+   two apart -- the magnifier icons now carry that difference. */
 .filter-in-btn {
-  color: #10b981;
+  color: var(--color-text-muted);
 }
 
 .filter-in-btn:hover {
-  background-color: #d1fae5;
-  border-color: #10b981;
-  color: #059669;
+  background-color: var(--color-success-wash);
+  border-color: var(--color-success);
+  color: var(--color-success);
 }
 
 .filter-out-btn {
-  color: #ef4444;
+  color: var(--color-text-muted);
 }
 
 .filter-out-btn:hover {
-  background-color: #fee2e2;
-  border-color: #ef4444;
-  color: #dc2626;
+  background-color: var(--color-danger-wash);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 .toggle-column-btn {
@@ -646,15 +617,15 @@
 }
 
 .toggle-column-btn:hover {
-  background-color: #006bb4;
-  border-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .toggle-column-btn.selected {
-  background-color: #006bb4;
-  border-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .table-field-name {
@@ -664,14 +635,10 @@
   min-width: 180px;
   max-width: 180px;
   background-color: var(--bg-tertiary);
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
   word-wrap: break-word;
   word-break: break-all;
   overflow-wrap: break-word;
-}
-
-.dark-mode .table-field-name {
-  color: #ef4444;
 }
 
 .table-field-value {
@@ -680,32 +647,35 @@
 }
 
 .table-field-value code {
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
   white-space: pre-wrap;
   word-wrap: break-word;
   color: var(--text-primary);
   background: none;
 }
 
-/* Syntax highlighting for values in dark mode */
-.dark-mode .syntax-number {
-  color: #60a5fa;
+/* Syntax highlighting for JSON values.
+   These classes previously existed only under .dark-mode, so values rendered
+   with no colour distinction at all in light mode. Now both themes come from
+   the syntax tokens. */
+.syntax-number {
+  color: var(--color-syntax-number);
 }
 
-.dark-mode .syntax-string {
-  color: #4ade80;
+.syntax-string {
+  color: var(--color-syntax-string);
 }
 
-.dark-mode .syntax-boolean {
-  color: #a78bfa;
+.syntax-boolean {
+  color: var(--color-syntax-boolean);
 }
 
-.dark-mode .syntax-null {
-  color: #94a3b8;
+.syntax-null {
+  color: var(--color-syntax-null);
 }
 
-.dark-mode .syntax-object {
-  color: #fbbf24;
+.syntax-object {
+  color: var(--color-syntax-key);
 }
 
 .loading-state,
@@ -714,7 +684,7 @@
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: var(--text-tertiary);
+  color: var(--color-text-muted);
   font-size: 1rem;
 }
 
@@ -749,7 +719,7 @@
   width: 24px;
   height: 24px;
   border: 3px solid var(--border-color);
-  border-top-color: #667eea;
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -766,35 +736,26 @@
 }
 
 .results-table::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 .results-table::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--color-border-strong);
   border-radius: 5px;
 }
 
 .results-table::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--color-text-subtle);
 }
 
 .result-table tbody td {
   border-bottom: 1px solid var(--border-color) !important;
 }
 
-/* Optional: darker line for visibility */
-.dark-mode .result-table tbody td {
-  border-bottom: 1px solid #444 !important;
-}
 mark.search-highlight {
-  background-color: #fff176;
-  color: inherit;
+  background-color: var(--color-highlight-bg);
+  color: var(--color-highlight-text);
   border-radius: 2px;
   padding: 0 1px;
 }
 
-.dark-mode mark.search-highlight,
-[data-theme="dark"] mark.search-highlight {
-  background-color: #b5890a;
-  color: #fff;
-}

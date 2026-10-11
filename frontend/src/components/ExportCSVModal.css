@@ -6,8 +6,8 @@
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border: 1px solid #f59e0b;
+  background: var(--color-warning-wash);
+  border: 1px solid var(--color-warning);
   border-radius: 6px;
   margin-bottom: 1.5rem;
 }
@@ -23,14 +23,14 @@
 
 .warning-content strong {
   display: block;
-  color: #92400e;
+  color: var(--color-on-warning-wash);
   font-size: 0.875rem;
   margin-bottom: 0.25rem;
 }
 
 .warning-content p {
   margin: 0;
-  color: #78350f;
+  color: var(--color-on-warning-wash);
   font-size: 0.8rem;
   line-height: 1.4;
 }
@@ -66,7 +66,7 @@
 }
 
 .info-value.export-count {
-  color: #006bb4;
+  color: var(--color-primary);
 }
 
 .export-size-info {
@@ -102,21 +102,21 @@
   font-size: 0.875rem;
   color: var(--text-primary);
   font-weight: 600;
-  font-family: 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
 }
 
 .size-value.compressed {
-  color: #059669;
+  color: var(--color-success);
   font-size: 1.1rem;
 }
 
 .size-value.download-size {
-  color: #f59e0b;
+  color: var(--color-warning);
 }
 
 .export-note {
-  background: rgba(0, 107, 180, 0.1);
-  border: 1px solid rgba(0, 107, 180, 0.3);
+  background: var(--color-primary-wash);
+  border: 1px solid var(--color-primary);
   border-radius: 4px;
   padding: 0.75rem;
   font-size: 0.8rem;
@@ -125,5 +125,5 @@
 }
 
 .export-note strong {
-  color: #006bb4;
+  color: var(--color-primary);
 }

@@ -1,10 +1,10 @@
 # qwui
 
-<a href="qwui-1.png"><img src="qwui-1.png" width="600"></a>
-<a href="qwui-2.png"><img src="qwui-2.png" width="600"></a>
-<a href="qwui-3.png"><img src="qwui-3.png" width="600"></a>
+<a href="doc/screenshots/qwui-logs.png"><img src="doc/screenshots/qwui-logs.png" width="600" alt="Logs view"></a>
+<a href="doc/screenshots/qwui-visualize.png"><img src="doc/screenshots/qwui-visualize.png" width="600" alt="Visualize view"></a>
+<a href="doc/screenshots/qwui-traces.png"><img src="doc/screenshots/qwui-traces.png" width="600" alt="Traces view"></a>
 
-A Kibana-like log explorer UI for [Quickwit](https://quickwit.io). React frontend, choice of Go or Rust backend and OIDC support.
+A Kibana-like log explorer UI for [Quickwit](https://quickwit.io). React frontend, Rust backend, OIDC support, and a read-only MCP endpoint for AI agents.
 
 ## Architecture
 
@@ -14,9 +14,14 @@ Browser
         └── /api/*       → qwui backend (port 8080)
         └── /quickwit/*  → qwui backend (port 8080)
               └── proxies to Quickwit (port 7280)
+
+AI agent
+  └── /mcp             → qwui backend (port 8080)   [read-only, bearer auth]
+        └── Quickwit (port 7280)
 ```
 
-The backend handles auth, CSV export, log pattern detection (Drain algorithm), and proxies all Quickwit API calls.
+The backend handles auth, CSV export, log pattern detection (Drain algorithm),
+serves the MCP endpoint, and proxies all Quickwit API calls.
 
 ## Project structure
 
@@ -25,13 +30,14 @@ qwui/
 ├── frontend/          # React + Vite app
 │   ├── src/
 │   └── public/
-├── go-backend/        # Go backend
-│   └── pattern/       # standalone Drain algorithm test tool
-├── rust-backend/      # Rust backend (includes VRL support)
+├── rust-backend/      # Rust backend (VRL, MCP endpoint)
+│   └── quickwit-api-surface.json   # vendored Quickwit API contract, see MCP
+├── ci/                # Quickwit API spec refresher
+├── doc/
+│   └── MCP.md         # MCP endpoint reference
 ├── dev/               # Docker data generator (Python)
 ├── k6/                # Load tests
-├── Dockerfile.go      # Builds frontend + Go backend into one image
-├── Dockerfile.rust    # Builds frontend + Rust backend into one image
+├── Dockerfile         # Builds frontend + backend into one image
 ├── docker-compose.yml
 └── Makefile
 ```
@@ -42,7 +48,7 @@ qwui/
 
 - Docker + Docker Compose
 - Node.js 20+
-- Go 1.24+ **or** Rust 1.75+
+- Rust 1.75+
 
 ### Option 1 — Local backend, Quickwit in Docker
 
@@ -52,11 +58,10 @@ Start Quickwit and the data generator:
 make dev
 ```
 
-Then run whichever backend you want locally:
+Then run the backend locally:
 
 ```bash
-make run-go    # cd go-backend && go run .
-make run-rust  # cd rust-backend && cargo run
+make run-backend  # cd rust-backend && cargo run
 ```
 
 Then start the frontend:
@@ -68,17 +73,10 @@ cd frontend && npm install && npm run dev
 
 Open http://localhost:5173
 
-### Option 2 — Go backend in Docker
+### Option 2 — Backend in Docker
 
 ```bash
-make dev-go
-make run-frontend
-```
-
-### Option 3 — Rust backend in Docker
-
-```bash
-make dev-rust
+make dev-backend
 make run-frontend
 ```
 
@@ -93,8 +91,7 @@ make down      # stop all containers and wipe data volumes
 ```bash
 make logs                              # all services
 docker compose logs -f data-generator # generator only
-docker compose logs -f qwui-go        # Go backend
-docker compose logs -f qwui-rust      # Rust backend
+docker compose logs -f qwui           # backend
 ```
 
 ## Docker Compose services
@@ -103,10 +100,7 @@ docker compose logs -f qwui-rust      # Rust backend
 |---------|---------|-------------|
 | `quickwit` | _(always)_ | Quickwit search engine on port 7280 |
 | `data-generator` | _(always)_ | Continuously ingests sample logs into the `demo` index |
-| `qwui-go` | `go` | Go backend on port 8080 |
-| `qwui-rust` | `rust` | Rust backend on port 8080 |
-
-`qwui-go` and `qwui-rust` both bind port 8080 — only one can run at a time.
+| `qwui` | `backend` | Backend on port 8080 |
 
 ## Sample data
 
@@ -135,7 +129,7 @@ The index is named `demo` with `timestamp` as the timestamp field.
 | **Load** | Lists queries previously saved in the `qwui` index. |
 | **Share** | Copies a URL to the clipboard encoding the full query state. Opening the URL restores the exact search. |
 | **∿ Patterns** | Analyses log patterns using the Drain algorithm. Samples events across time buckets, clusters them by similarity, and shows the top patterns with their percentage. A field selector lets you run the analysis on a specific field. |
-| **ƒ VRL** | _(Rust backend only)_ Opens a VRL (Vector Remap Language) script editor. The script is applied server-side to each result document before it is returned, allowing field extraction, renaming, or computed fields. |
+| **ƒ VRL** | Opens a VRL (Vector Remap Language) script editor. The script is applied server-side to each result document before it is returned, allowing field extraction, renaming, or computed fields. |
 | **Export** | Exports the current search results as a gzip-compressed CSV file, generated by the backend. |
 
 ### Saved queries — `qwui` index
@@ -169,9 +163,11 @@ search_settings:
 EOF
 ```
 
-### VRL — Rust backend only
+### VRL
 
-The VRL button is only shown when the backend reports `features.vrl: true` in `/api/auth/status`. This is only the case with the Rust backend, which embeds the VRL runtime. The Go backend silently ignores any `vrl` field and always reports `features.vrl: false`.
+The VRL button is shown when the backend reports `features.vrl: true` in
+`/api/auth/status`. The backend embeds the VRL runtime, so this is always true;
+the flag remains so the frontend degrades cleanly against an older backend.
 
 Example VRL script:
 
@@ -236,6 +232,36 @@ In Visualize mode a **GraphView** panel replaces the results table. You can:
 
 Only numeric fields are accepted on the Y-axis — float fields are validated via a `stats` aggregation; text/keyword fields are rejected with an error message.
 
+## MCP endpoint — read-only Quickwit access for AI agents
+
+qwui serves a [Model Context Protocol](https://modelcontextprotocol.io) endpoint
+at **`/mcp`**, so an agent can search and diagnose the logs the UI shows. Off by
+default:
+
+```bash
+MCP_ENABLED=true
+MCP_TOKENS=claude-code:$(openssl rand -hex 32)
+```
+
+```bash
+claude mcp add --transport http qwui https://qwui.example.com/mcp \
+  --header "Authorization: Bearer <token>"
+```
+
+17 tools, every one a call to Quickwit's own API — search, aggregations
+(distinct values, percentiles, counts over time), index and cluster inspection —
+plus `summarize_log_patterns`, which reuses the UI's Drain clustering to collapse
+ten thousand log lines into a handful of templates.
+
+Read-only by construction rather than by flag: a mutating request cannot be
+expressed in the code, and a test asserts it. Concurrency and rate limits are
+sized from the capacity Quickwit reports about itself, and every call is audited
+and counted in Prometheus.
+
+**Full documentation: [doc/MCP.md](doc/MCP.md)** — tools, query syntax,
+authentication, guardrail, audit, and how the tool set is kept in step with
+Quickwit upgrades.
+
 ## Environment variables
 
 | Variable | Default | Description |
@@ -246,10 +272,45 @@ Only numeric fields are accepted on the Y-axis — float fields are validated vi
 | `VITE_SAVED_QUERIES_INDEX` | `qwui` | Quickwit index used to store saved queries |
 | `OIDC_ENABLED` | `false` | Enable OIDC authentication |
 | `OIDC_CLIENT_ID` | — | OIDC client ID |
-| `OIDC_SECRET` | — | OIDC client secret |
+| `OIDC_CLIENT_SECRET` | — | OIDC client secret |
 | `OIDC_ISSUER` | — | OIDC issuer URL |
-| `OIDC_REDIRECT` | — | OIDC redirect URL |
+| `OIDC_REDIRECT_URL` | — | OIDC redirect URL |
+| `OIDC_POST_LOGOUT_REDIRECT_URL` | — | Where the provider returns after logout (see [Logout](#logout)) |
 | `SESSION_SECRET` | — | Cookie session secret |
+| `LOG_LEVEL` | `info` | Backend log level |
+| `ORIGIN` | — | Comma-separated allowed CORS origins |
+| `QUICKWIT_INDEXER_URL` | — | Separate endpoint for ingest requests and the MCP `indexing_status` tool |
+| `MCP_ENABLED` | `false` | Serve the read-only MCP endpoint at `/mcp` |
+| `MCP_TOKENS` | — | Comma-separated bearer tokens. Required when `MCP_ENABLED=true`, or `/mcp` is not mounted |
+| `MCP_ALLOWED_HOSTS` | _derived_ | `Host` allowlist. Defaults to localhost plus the hostnames in `OIDC_REDIRECT_URL` and `ORIGIN` |
+| `MCP_ALLOWED_ORIGINS` | — | `Origin` allowlist. Empty means unchecked, which is right for agents |
+| `MCP_MAX_HITS` | `50` | Ceiling on documents one `search_logs` call may return |
+| `MCP_RATE_LIMIT_PER_MIN` | `120` | Tool calls per token per minute |
+| `METRICS_ENABLED` | `false` | Serve Prometheus metrics at `/metrics` |
+| `MCP_MAX_CONCURRENT_REQUESTS` | _probed_ | Overrides the concurrency derived from Quickwit's own reported capacity |
+
+Copy [.env.example](.env.example) to `.env` to get started. `.env` is gitignored — never commit real secrets.
+
+## Logout
+
+Logging out navigates to `/logout`, which clears the qwui session cookie **and**
+asks the identity provider to end its own SSO session
+([RP-initiated logout](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)).
+
+Both halves matter. Clearing only the local cookie is not a logout: the provider
+still holds its SSO session, so the next sign-in is granted silently without a
+prompt and the user appears never to have logged out.
+
+At startup the backend reads `end_session_endpoint` from the provider discovery
+document (`<issuer>/.well-known/openid-configuration`) and logs whether
+RP-initiated logout is available. Not every provider implements it — when the
+endpoint is absent, logout clears the local session only and the backend logs a
+warning to that effect.
+
+For the return trip to work, `OIDC_POST_LOGOUT_REDIRECT_URL` must be registered
+as a valid post-logout redirect URI on the provider side, or the provider will
+reject the logout request. Leave it empty to omit the parameter and let the
+provider land on its own default page.
 
 ## Helm
 
@@ -261,14 +322,6 @@ A Helm chart is available under [helm/qwui/](helm/qwui/).
 helm repo add qwui https://gitarns.github.io/qwui
 helm repo update
 helm install qwui qwui/qwui \
-  --set quickwit.url=http://quickwit:7280
-```
-
-### Use the Rust backend image
-
-```bash
-helm install qwui qwui/qwui \
-  --set image.repository=ghcr.io/gitarns/qwui-rust \
   --set quickwit.url=http://quickwit:7280
 ```
 
@@ -288,19 +341,38 @@ helm install qwui qwui/qwui \
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `image.repository` | `ghcr.io/gitarns/qwui-go` | Image to use (`qwui-go` or `qwui-rust`) |
+| `image.repository` | `ghcr.io/gitarns/qwui` | Image repository |
 | `image.tag` | chart `appVersion` | Image tag |
 | `quickwit.url` | `http://quickwit:7280` | Quickwit base URL |
 | `replicaCount` | `1` | Number of replicas |
+| `maxExportDocs` | — | Overrides `MAX_EXPORT_DOCS` (backend default 10000) |
 | `ingress.enabled` | `false` | Enable ingress |
-| `extraEnv` | `[]` | Extra environment variables |
+| `extraEnv` / `extraEnvFrom` | `[]` | Extra environment variables, e.g. OIDC settings |
+
+OIDC is configured through `extraEnv` / `extraEnvFrom` — keep
+`OIDC_CLIENT_SECRET` and `SESSION_SECRET` in a Kubernetes Secret and reference
+it with `extraEnvFrom`, rather than passing them via `--set`.
+
+The [MCP endpoint](#mcp-endpoint--read-only-quickwit-access-for-ai-agents) is
+configured the same way. `MCP_TOKENS` is a credential, so it belongs in the same
+Secret — never in `--set`, where it lands in the release history and your shell
+history:
+
+```yaml
+extraEnv:
+  - name: MCP_ENABLED
+    value: "true"
+  # In a distributed Quickwit deployment quickwit.url points at a searcher, so
+  # the indexing_status tool needs the indexer named separately.
+  - name: QUICKWIT_INDEXER_URL
+    value: http://quickwit-indexer.quickwit.svc.cluster.local:7280
+extraEnvFrom:
+  - secretRef:
+      name: qwui-secrets   # holds MCP_TOKENS, OIDC_CLIENT_SECRET, SESSION_SECRET
+```
 
 ## Building for production
 
 ```bash
-# Go backend
-docker build -f Dockerfile.go -t qwui:go .
-
-# Rust backend
-docker build -f Dockerfile.rust -t qwui:rust .
+docker build -t qwui .
 ```

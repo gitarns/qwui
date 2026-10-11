@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import './TimeRangePicker.css'
+import { IconCalendar } from './Icon'
 
 const QUICK_RANGES = [
   { label: 'Last 5 minutes', value: 5, unit: 'minutes' },
@@ -16,6 +17,13 @@ const QUICK_RANGES = [
   { label: 'Last 90 days', value: 90, unit: 'days' },
   { label: 'Last 1 year', value: 1, unit: 'years' },
 ]
+
+// Step of the time list in the Absolute tab. It was one minute: 1440 rows,
+// rebuilt on every keystroke in the manual input, which made the popup crawl,
+// and nobody scrolls a day minute by minute anyway. 30 is what Kibana uses;
+// the selected time is injected into the list so it still shows exactly, and
+// precise times are typed in the manual input.
+const TIME_LIST_STEP_MINUTES = 30
 
 const RELATIVE_UNITS = [
   { value: 'seconds', label: 'Seconds' },
@@ -64,6 +72,9 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
   const toPopupRef = useRef(null)
   const fromInputRef = useRef(null)
   const toInputRef = useRef(null)
+  // The label this picker last sent up, so the `value` sync below can tell
+  // its own change coming back from one made elsewhere (a shared link).
+  const emittedLabelRef = useRef('Last 15 minutes')
 
   // Initialize with default range on mount
   useEffect(() => {
@@ -117,10 +128,12 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
             setRelativeFromValue(val)
             setRelativeFromUnit(unit)
             setRelativeFromDirection('ago')
-          } else {
-            // Fallback if label doesn't match "Last X Y" pattern
-            // but we want to default to relative/now if it looks like a quick range
-            // For now, just keep existing tabs or default behavior
+          } else if (value.label !== emittedLabelRef.current) {
+            // An absolute range set from outside the picker (a shared link,
+            // a saved query): show its dates when expanded, not whatever
+            // relative values the tabs were last left on.
+            setFromTab('absolute')
+            setToTab(value.toIsNow ? 'now' : 'absolute')
           }
         }
       }
@@ -179,6 +192,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     setShowExpandedView(false)
     setQuickSelectOpen(false)
 
+    emittedLabelRef.current = range.label
     onTimeRangeChange({
       from: Math.floor(from / 1000), // Convert to seconds for Quickwit
       to: Math.floor(to / 1000), // Convert to seconds for Quickwit
@@ -313,6 +327,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     // Always update display label to match what we send
     setDisplayLabel(label)
 
+    emittedLabelRef.current = label
     onTimeRangeChange({
       from: Math.floor(from / 1000), // Convert to seconds for Quickwit
       to: Math.floor(to / 1000), // Convert to seconds for Quickwit
@@ -345,17 +360,29 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
   }
 
+  // Accepts what the field displays (YYYY-MM-DD HH:mm[:ss], local time, or a
+  // bare date for midnight), ISO 8601 with a Z or offset (pasted from a log
+  // line), and Unix timestamps in seconds or milliseconds. Parsed by hand
+  // rather than with `new Date(input)`, whose handling of the space-separated
+  // form varies by browser and which quietly rolls 2026-02-31 into March.
   const parseManualDate = (input) => {
-    // Accept formats: YYYY-MM-DD HH:mm:ss, YYYY-MM-DD HH:mm, or ISO formats
-    try {
-      const date = new Date(input)
-      if (isNaN(date.getTime())) {
-        return null
-      }
-      return date
-    } catch (e) {
-      return null
+    const text = input.trim()
+    if (/^\d{10}$/.test(text)) return new Date(Number(text) * 1000)
+    if (/^\d{13}$/.test(text)) return new Date(Number(text))
+
+    const local = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/)
+    if (local) {
+      const [y, mo, d, h = 0, mi = 0, s = 0] = local.slice(1).map(part => part === undefined ? undefined : Number(part))
+      if (mo < 1 || mo > 12 || h > 23 || mi > 59 || s > 59) return null
+      const date = new Date(y, mo - 1, d, h, mi, s)
+      return date.getDate() === d ? date : null
     }
+
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+      const date = new Date(text)
+      return isNaN(date.getTime()) ? null : date
+    }
+    return null
   }
 
   const handleFromDateInputChange = (value) => {
@@ -372,6 +399,17 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     if (parsed) {
       setToDate(parsed)
     }
+  }
+
+  // Empty is not an error: Apply then takes the calendar's selection.
+  const fromInputInvalid = fromTab === 'absolute' && fromDateInput.trim() !== '' && !parseManualDate(fromDateInput)
+  const toInputInvalid = toTab === 'absolute' && toDateInput.trim() !== '' && !parseManualDate(toDateInput)
+
+  // Rewrite a pasted epoch or ISO string into the field's own format once the
+  // user leaves it, so they can see which instant it was read as.
+  const normaliseDateInput = (value, setInput) => {
+    const parsed = parseManualDate(value)
+    if (parsed) setInput(formatDateForInput(parsed))
   }
 
   // Update input fields when tab changes to absolute or when date changes (but not when input is focused)
@@ -394,8 +432,9 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
           className="calendar-quick-select-btn"
           onClick={() => setQuickSelectOpen(!quickSelectOpen)}
           title="Commonly used time ranges"
+          aria-label="Commonly used time ranges"
         >
-          📅
+          <IconCalendar />
         </button>
         {activeRelativeRange && !showExpandedView ? (
           <button
@@ -514,20 +553,33 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
                   onChange={(date) => setFromDate(date)}
                   showTimeSelect
                   timeFormat="HH:mm:ss"
-                  timeIntervals={1}
+                  timeIntervals={TIME_LIST_STEP_MINUTES}
+                  injectTimes={[fromDate]}
                   dateFormat="MMMM d, yyyy HH:mm:ss"
                   inline
                 />
                 <div className="manual-date-input-container">
-                  <label>Manual input:</label>
+                  <label htmlFor="time-range-from-input">Manual input:</label>
                   <input
+                    id="time-range-from-input"
                     ref={fromInputRef}
                     type="text"
                     value={fromDateInput}
                     onChange={(e) => handleFromDateInputChange(e.target.value)}
+                    onBlur={(e) => normaliseDateInput(e.target.value, setFromDateInput)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !fromInputInvalid) applyFromTime()
+                    }}
                     placeholder="YYYY-MM-DD HH:mm:ss"
-                    className="manual-date-input"
+                    className={`manual-date-input ${fromInputInvalid ? 'invalid' : ''}`}
+                    aria-invalid={fromInputInvalid}
+                    aria-describedby="time-range-from-hint"
                   />
+                  <p id="time-range-from-hint" className={`manual-date-hint ${fromInputInvalid ? 'invalid' : ''}`}>
+                    {fromInputInvalid
+                      ? 'Not a date. Use YYYY-MM-DD HH:mm:ss, ISO 8601 or a Unix timestamp.'
+                      : 'Local time, or ISO 8601 / Unix timestamp. Enter to apply.'}
+                  </p>
                 </div>
               </div>
             )}
@@ -567,7 +619,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
           </div>
 
           <div className="time-popup-footer">
-            <button className="apply-btn" onClick={applyFromTime}>
+            <button className="apply-btn" onClick={applyFromTime} disabled={fromInputInvalid}>
               Apply
             </button>
           </div>
@@ -606,20 +658,33 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
                   onChange={(date) => setToDate(date)}
                   showTimeSelect
                   timeFormat="HH:mm:ss"
-                  timeIntervals={1}
+                  timeIntervals={TIME_LIST_STEP_MINUTES}
+                  injectTimes={[toDate]}
                   dateFormat="MMMM d, yyyy HH:mm:ss"
                   inline
                 />
                 <div className="manual-date-input-container">
-                  <label>Manual input:</label>
+                  <label htmlFor="time-range-to-input">Manual input:</label>
                   <input
+                    id="time-range-to-input"
                     ref={toInputRef}
                     type="text"
                     value={toDateInput}
                     onChange={(e) => handleToDateInputChange(e.target.value)}
+                    onBlur={(e) => normaliseDateInput(e.target.value, setToDateInput)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !toInputInvalid) applyToTime()
+                    }}
                     placeholder="YYYY-MM-DD HH:mm:ss"
-                    className="manual-date-input"
+                    className={`manual-date-input ${toInputInvalid ? 'invalid' : ''}`}
+                    aria-invalid={toInputInvalid}
+                    aria-describedby="time-range-to-hint"
                   />
+                  <p id="time-range-to-hint" className={`manual-date-hint ${toInputInvalid ? 'invalid' : ''}`}>
+                    {toInputInvalid
+                      ? 'Not a date. Use YYYY-MM-DD HH:mm:ss, ISO 8601 or a Unix timestamp.'
+                      : 'Local time, or ISO 8601 / Unix timestamp. Enter to apply.'}
+                  </p>
                 </div>
               </div>
             )}
@@ -665,7 +730,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
           </div>
 
           <div className="time-popup-footer">
-            <button className="apply-btn" onClick={applyToTime}>
+            <button className="apply-btn" onClick={applyToTime} disabled={toInputInvalid}>
               Apply
             </button>
           </div>

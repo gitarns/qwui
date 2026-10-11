@@ -1,12 +1,52 @@
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/* ==========================================================================
+   qwui base layer
+   --------------------------------------------------------------------------
+   Loaded once from main.jsx, before any component CSS. Order matters:
+   fonts, then tokens, then the reusable primitives, then element defaults.
 
-  color: #213547;
-  background-color: #ffffff;
+   Fonts are self-hosted rather than pulled from the Google Fonts CDN: qwui is
+   deployed on an internal network where that CDN is not necessarily reachable,
+   and a blocked stylesheet would silently fall back to system fonts.
+   Only the latin subset is bundled (it covers accented characters); anything
+   outside it falls through to the system stack declared in the tokens.
+   ========================================================================== */
+
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-sans/latin-700.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+@import '@fontsource/jetbrains-mono/latin-700.css';
+
+@import './styles/tokens.css';
+@import './styles/primitives.css';
+
+/* ---------- Reset ------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  /* Stops iOS from inflating text in landscape, which would break the dense
+     table layout. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: var(--qw-font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-regular);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background-color: var(--color-canvas);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -14,42 +54,143 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
 #root {
   width: 100%;
   height: 100vh;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  margin: 0;
-  font-weight: 600;
+/* ---------- Typography -------------------------------------------------- */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text);
+  /* Avoids a single trailing word on its own line in panel and modal titles. */
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--text-xl); }
+h2 { font-size: var(--text-lg); }
+h3 { font-size: var(--text-md); }
+h4,
+h5,
+h6 { font-size: var(--text-base); }
+
+p {
+  line-height: var(--leading-normal);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--qw-font-mono);
+  font-size: 0.9375em;
 }
 
 a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+  color: var(--color-primary);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
 }
 
 a:hover {
-  color: #535bf2;
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+/* ---------- Focus ------------------------------------------------------- */
+/* One visible ring for every keyboard-focusable element. :focus-visible keeps
+   it off mouse clicks without ever removing it for keyboard users. */
+
+:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- Form controls ----------------------------------------------- */
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
 }
 
 button {
-  font-family: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
 }
 
-input, select, textarea {
-  font-family: inherit;
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+textarea {
+  resize: vertical;
+}
+
+::placeholder {
+  color: var(--color-text-subtle);
+  opacity: 1; /* Firefox dims placeholders on top of the colour */
+}
+
+/* Search inputs carry a UA-styled clear button in WebKit that ignores the
+   theme; ours is drawn by the components instead. */
+input[type='search']::-webkit-search-decoration,
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* ---------- Selection --------------------------------------------------- */
+
+::selection {
+  background-color: var(--color-primary-wash);
+  color: var(--color-text);
+}
+
+/* ---------- Scrollbars -------------------------------------------------- */
+/* The app is full of scroll areas (results, fields sidebar, trace view). The
+   default light scrollbar on a dark surface is one of the most visible theme
+   leaks, so both themes are driven from the tokens. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  /* Inset the thumb without needing a separate track element. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-subtle);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }

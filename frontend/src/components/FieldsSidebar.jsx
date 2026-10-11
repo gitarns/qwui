@@ -1,5 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import './FieldsSidebar.css'
+import {
+  IconSearch,
+  IconPlus,
+  IconMinus,
+  IconChevronRight,
+  IconFilterIn,
+  IconFilterOut,
+} from './Icon'
 
 function loadPopularity() {
   try { return JSON.parse(localStorage.getItem('fieldPopularity') || '{}') } catch { return {} }
@@ -49,11 +57,6 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
   const filteredPopular = popularFields.filter(f =>
     f.toLowerCase().includes(searchTerm.toLowerCase())
   )
-
-  const getFieldAggregation = (fieldName) => {
-    if (!aggregations) return null
-    return aggregations[fieldName]
-  }
 
   const handleInclude = (fieldName, value) => {
     if (onFilterChange) {
@@ -280,7 +283,9 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
       </div>
 
       <div className="field-search">
-        <span className="search-icon">🔍</span>
+        <span className="search-icon">
+          <IconSearch />
+        </span>
         <input
           type="text"
           placeholder="Search field names"
@@ -313,9 +318,7 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
 
           <div className="fields-list selected-fields-list">
             {[...selectedColumns].sort((a, b) => a.localeCompare(b)).map(field => {
-              const aggregation = getFieldAggregation(field)
               const isLoading = loadingFields.has(field)
-              const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
               return (
                 <div key={field} className="field-item selected-field-item">
                   <div className="field-header" onClick={(e) => handleFieldClick(field, e)} style={{ cursor: 'pointer' }}>
@@ -379,8 +382,13 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                       <span className="field-name" title={field}>
                         {field}
                       </span>
-                      {isLoading && <span className="field-loading" title="Loading aggregation data">⟳</span>}
-                      {!isLoading && !hasBuckets && <span className="field-no-stats" title="Click to load aggregation data">◯</span>}
+                      {isLoading ? (
+                        <span className="field-loading" title="Loading top values">⟳</span>
+                      ) : (
+                        <span className="field-affordance">
+                          <IconChevronRight />
+                        </span>
+                      )}
                     </div>
                     <button
                       className="add-column-btn selected"
@@ -389,8 +397,9 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                         trackFieldUse(field); onToggleColumn && onToggleColumn(field)
                       }}
                       title="Remove field as column"
+                      aria-label="Remove field as column"
                     >
-                      −
+                      <IconMinus />
                     </button>
                   </div>
                 </div>
@@ -413,9 +422,7 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
         <div className="fields-list popular-fields-list">
           <div className="popular-section-label">Popular</div>
           {filteredPopular.map(field => {
-            const aggregation = aggregations?.[field]
             const isLoading = loadingFields.has(field)
-            const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
             const isColumnSelected = selectedColumns.includes(field)
             return (
               <div key={`popular-${field}`} className="field-item popular-field-item">
@@ -470,15 +477,21 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                   >
                     <span className="field-icon">t</span>
                     <span className="field-name" title={field}>{field}</span>
-                    {isLoading && <span className="field-loading" title="Loading aggregation data">⟳</span>}
-                    {!isLoading && !hasBuckets && <span className="field-no-stats" title="Click to load aggregation data">◯</span>}
+                    {isLoading ? (
+                      <span className="field-loading" title="Loading top values">⟳</span>
+                    ) : (
+                      <span className="field-affordance">
+                        <IconChevronRight />
+                      </span>
+                    )}
                   </div>
                   <button
                     className={`add-column-btn ${isColumnSelected ? 'selected' : ''}`}
                     onClick={(e) => { e.stopPropagation(); trackFieldUse(field); onToggleColumn && onToggleColumn(field) }}
                     title={isColumnSelected ? 'Remove field as column' : 'Add field as column'}
+                    aria-label={isColumnSelected ? 'Remove field as column' : 'Add field as column'}
                   >
-                    {isColumnSelected ? '−' : '+'}
+                    {isColumnSelected ? <IconMinus /> : <IconPlus />}
                   </button>
                 </div>
               </div>
@@ -495,9 +508,7 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
           </div>
         ) : (
           filteredFields.map(field => {
-            const aggregation = getFieldAggregation(field)
             const isLoading = loadingFields.has(field)
-            const hasBuckets = aggregation && aggregation.buckets && aggregation.buckets.length > 0
             const isColumnSelected = selectedColumns.includes(field)
 
             return (
@@ -555,8 +566,13 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                     <span className="field-name" title={field}>
                       {field}
                     </span>
-                    {isLoading && <span className="field-loading" title="Loading aggregation data">⟳</span>}
-                    {!isLoading && !hasBuckets && <span className="field-no-stats" title="Click to load aggregation data">◯</span>}
+                    {isLoading ? (
+                      <span className="field-loading" title="Loading top values">⟳</span>
+                    ) : (
+                      <span className="field-affordance">
+                        <IconChevronRight />
+                      </span>
+                    )}
                   </div>
                   <button
                     className={`add-column-btn ${isColumnSelected ? 'selected' : ''}`}
@@ -565,8 +581,9 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                       trackFieldUse(field); onToggleColumn && onToggleColumn(field)
                     }}
                     title={isColumnSelected ? 'Remove field as column' : 'Add field as column'}
+                    aria-label={isColumnSelected ? 'Remove field as column' : 'Add field as column'}
                   >
-                    {isColumnSelected ? '−' : '+'}
+                    {isColumnSelected ? <IconMinus /> : <IconPlus />}
                   </button>
                 </div>
               </div>
@@ -608,7 +625,7 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                         }}
                         title="Include this value"
                       >
-                        ⊕
+                        <IconFilterIn />
                       </button>
                       <button
                         className="popover-filter-btn popover-exclude-btn"
@@ -618,7 +635,7 @@ function FieldsSidebar({ fields, aggregations, loadingFields = new Set(), onFilt
                         }}
                         title="Exclude this value"
                       >
-                        ⊖
+                        <IconFilterOut />
                       </button>
                     </div>
                   </div>

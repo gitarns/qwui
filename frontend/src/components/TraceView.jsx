@@ -414,7 +414,7 @@ export default function TraceView({
 
           {!loading && traceList.length === 0 && !error && (
             <div className="trace-placeholder">
-              No traces found. Select a traces index (e.g. <code>otel-traces-v0_7</code>) and click Search.
+              No traces found. Select a traces index (e.g. <code>otel-traces-v0_9</code>) and click Search.
             </div>
           )}
 
