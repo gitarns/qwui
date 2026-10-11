@@ -64,6 +64,9 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
   const toPopupRef = useRef(null)
   const fromInputRef = useRef(null)
   const toInputRef = useRef(null)
+  // The label this picker last sent up, so the `value` sync below can tell
+  // its own change coming back from one made elsewhere (a shared link).
+  const emittedLabelRef = useRef('Last 15 minutes')
 
   // Initialize with default range on mount
   useEffect(() => {
@@ -117,10 +120,12 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
             setRelativeFromValue(val)
             setRelativeFromUnit(unit)
             setRelativeFromDirection('ago')
-          } else {
-            // Fallback if label doesn't match "Last X Y" pattern
-            // but we want to default to relative/now if it looks like a quick range
-            // For now, just keep existing tabs or default behavior
+          } else if (value.label !== emittedLabelRef.current) {
+            // An absolute range set from outside the picker (a shared link,
+            // a saved query): show its dates when expanded, not whatever
+            // relative values the tabs were last left on.
+            setFromTab('absolute')
+            setToTab(value.toIsNow ? 'now' : 'absolute')
           }
         }
       }
@@ -179,6 +184,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     setShowExpandedView(false)
     setQuickSelectOpen(false)
 
+    emittedLabelRef.current = range.label
     onTimeRangeChange({
       from: Math.floor(from / 1000), // Convert to seconds for Quickwit
       to: Math.floor(to / 1000), // Convert to seconds for Quickwit
@@ -313,6 +319,7 @@ function TimeRangePicker({ onTimeRangeChange, value }) {
     // Always update display label to match what we send
     setDisplayLabel(label)
 
+    emittedLabelRef.current = label
     onTimeRangeChange({
       from: Math.floor(from / 1000), // Convert to seconds for Quickwit
       to: Math.floor(to / 1000), // Convert to seconds for Quickwit

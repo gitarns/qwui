@@ -374,7 +374,46 @@ async fn main() -> Result<()> {
 
 // Auth Handlers
 
-async fn login_handler(State(app_state): State<AppState>, session: Session) -> impl IntoResponse {
+/// Session key for the page to land on once the OIDC login completes.
+const POST_LOGIN_REDIRECT_KEY: &str = "post_login_redirect";
+
+/// Longest `return_to` kept. A search link carrying filters runs to a few KB;
+/// the cap stops a crafted link parking an arbitrary value in the in-memory
+/// session store.
+const MAX_RETURN_PATH_LEN: usize = 8192;
+
+#[derive(Deserialize)]
+struct LoginParams {
+    /// The page the browser was on when it was sent to log in, so a shared
+    /// search link survives the round trip through the identity provider.
+    return_to: Option<String>,
+}
+
+/// `candidate` if it is a path on this site, otherwise None. Anything a
+/// browser could read as another origin is refused rather than repaired:
+/// `//evil.example` and `/\evil.example` are protocol-relative to browsers,
+/// and browsers drop tabs and newlines from URLs, so `/\t/evil.example` turns
+/// into `//evil.example`. ASCII only, as the frontend sends it percent-encoded,
+/// which also keeps it a valid Location header.
+fn safe_return_path(candidate: &str) -> Option<&str> {
+    let path = candidate.split(['?', '#']).next().unwrap_or_default();
+    if candidate.len() > MAX_RETURN_PATH_LEN
+        || !candidate.is_ascii()
+        || !candidate.starts_with('/')
+        || candidate.starts_with("//")
+        || path.contains('\\')
+        || candidate.chars().any(|c| c.is_ascii_control())
+    {
+        return None;
+    }
+    Some(candidate)
+}
+
+async fn login_handler(
+    State(app_state): State<AppState>,
+    session: Session,
+    Query(params): Query<LoginParams>,
+) -> impl IntoResponse {
     let client = match app_state.oidc_client {
         Some(c) => c,
         None => return (StatusCode::INTERNAL_SERVER_ERROR, "OIDC not enabled").into_response(),
@@ -397,6 +436,18 @@ async fn login_handler(State(app_state): State<AppState>, session: Session) -> i
 
     // Store nonce in session (still needed for ID token validation)
     session.insert("oidc_nonce", nonce.secret()).await.unwrap();
+
+    // Cleared when absent, so an abandoned earlier login cannot send this one
+    // somewhere stale.
+    match params.return_to.as_deref().and_then(safe_return_path) {
+        Some(path) => session.insert(POST_LOGIN_REDIRECT_KEY, path).await.unwrap(),
+        None => {
+            session
+                .remove::<String>(POST_LOGIN_REDIRECT_KEY)
+                .await
+                .unwrap();
+        }
+    }
 
     Redirect::to(auth_url.as_str()).into_response()
 }
@@ -474,7 +525,16 @@ async fn auth_callback(
     session.insert("user", user).await.unwrap();
     session.remove::<String>("oidc_nonce").await.unwrap();
 
-    Redirect::to("/").into_response()
+    // Checked again on the way out: it came from a query string, and this is
+    // where it becomes a redirect.
+    let return_to = session
+        .remove::<String>(POST_LOGIN_REDIRECT_KEY)
+        .await
+        .unwrap()
+        .filter(|path| safe_return_path(path).is_some())
+        .unwrap_or_else(|| "/".to_string());
+
+    Redirect::to(&return_to).into_response()
 }
 
 async fn logout_handler(session: Session) -> impl IntoResponse {
@@ -1241,4 +1301,40 @@ async fn smart_proxy_middleware(
     }
 
     Ok(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn return_path_keeps_a_search_link() {
+        let link = "/?index=logs&query=level:error&from=now-15m&to=now&filters=%5B%5D";
+        assert_eq!(safe_return_path(link), Some(link));
+        assert_eq!(safe_return_path("/"), Some("/"));
+        // A backslash in the query string is data, not a path separator.
+        assert_eq!(safe_return_path(r"/?query=a\b"), Some(r"/?query=a\b"));
+    }
+
+    #[test]
+    fn return_path_refuses_other_origins() {
+        for hostile in [
+            "https://evil.example/",
+            "//evil.example",
+            r"/\evil.example",
+            "/\t/evil.example",
+            "/\n/evil.example",
+            "evil.example",
+            "",
+            "/caf\u{e9}",
+        ] {
+            assert_eq!(safe_return_path(hostile), None, "accepted {hostile:?}");
+        }
+    }
+
+    #[test]
+    fn return_path_is_capped() {
+        let long = format!("/?query={}", "a".repeat(MAX_RETURN_PATH_LEN));
+        assert_eq!(safe_return_path(&long), None);
+    }
 }

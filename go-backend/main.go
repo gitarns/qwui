@@ -50,15 +50,54 @@ type Config struct {
 	Origin             string
 }
 
-// StateStore manages OIDC state tokens with expiration
+// StateStore manages OIDC state tokens with expiration, and the page each
+// login should come back to.
 type StateStore struct {
 	mu     sync.RWMutex
-	states map[string]time.Time // state -> expiration time
+	states map[string]pendingLogin // state -> pending login
+}
+
+// pendingLogin is a login sent to the provider that has not come back yet.
+// returnTo lives here, server-side, rather than in the session: the session is
+// a cookie, and a search link carrying filters can outgrow one.
+type pendingLogin struct {
+	expires  time.Time
+	returnTo string
+}
+
+// maxReturnPathLen caps a login's return_to. A search link carrying filters
+// runs to a few KB; the cap stops a crafted link parking an arbitrary value
+// in memory.
+const maxReturnPathLen = 8192
+
+// safeReturnPath returns candidate if it is a path on this site, otherwise "".
+// Anything a browser could read as another origin is refused rather than
+// repaired: "//evil.example" and "/\evil.example" are protocol-relative to
+// browsers, and browsers drop tabs and newlines from URLs, so
+// "/\t/evil.example" turns into "//evil.example". ASCII only, as the frontend
+// sends it percent-encoded, which also keeps it a valid Location header.
+func safeReturnPath(candidate string) string {
+	path := candidate
+	if i := strings.IndexAny(path, "?#"); i >= 0 {
+		path = path[:i]
+	}
+	if len(candidate) > maxReturnPathLen ||
+		!strings.HasPrefix(candidate, "/") ||
+		strings.HasPrefix(candidate, "//") ||
+		strings.Contains(path, `\`) {
+		return ""
+	}
+	for i := 0; i < len(candidate); i++ {
+		if b := candidate[i]; b < 0x20 || b >= 0x7f {
+			return ""
+		}
+	}
+	return candidate
 }
 
 func NewStateStore() *StateStore {
 	store := &StateStore{
-		states: make(map[string]time.Time),
+		states: make(map[string]pendingLogin),
 	}
 	// Cleanup expired states every minute
 	go func() {
@@ -71,31 +110,33 @@ func NewStateStore() *StateStore {
 	return store
 }
 
-func (s *StateStore) Save(state string) {
+func (s *StateStore) Save(state, returnTo string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// State valid for 10 minutes
-	s.states[state] = time.Now().Add(10 * time.Minute)
+	s.states[state] = pendingLogin{expires: time.Now().Add(10 * time.Minute), returnTo: returnTo}
 }
 
-func (s *StateStore) Verify(state string) bool {
+// Verify consumes state and reports whether it was valid, along with the page
+// that login asked to come back to ("" for none).
+func (s *StateStore) Verify(state string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	expiration, exists := s.states[state]
-	if !exists || time.Now().After(expiration) {
+	login, exists := s.states[state]
+	if !exists || time.Now().After(login.expires) {
 		delete(s.states, state)
-		return false
+		return "", false
 	}
 	delete(s.states, state) // State can only be used once
-	return true
+	return login.returnTo, true
 }
 
 func (s *StateStore) Cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
-	for state, expiration := range s.states {
-		if now.After(expiration) {
+	for state, login := range s.states {
+		if now.After(login.expires) {
 			delete(s.states, state)
 		}
 	}
@@ -454,8 +495,10 @@ func main() {
 			}
 			stateStr := fmt.Sprintf("%x", state)
 
-			// Store state server-side (survives external redirects)
-			stateStore.Save(stateStr)
+			// Store state server-side (survives external redirects), with the
+			// page the browser was on, so a shared search link survives the
+			// round trip through the provider.
+			stateStore.Save(stateStr, safeReturnPath(c.Query("return_to")))
 
 			c.Redirect(http.StatusFound, oauth2Config.AuthCodeURL(stateStr))
 		})
@@ -463,7 +506,8 @@ func main() {
 		// Callback endpoint
 		r.GET("/auth/callback", func(c *gin.Context) {
 			// Verify state (prevents CSRF and ensures it was issued by us)
-			if !stateStore.Verify(c.Query("state")) {
+			returnTo, ok := stateStore.Verify(c.Query("state"))
+			if !ok {
 				log.Warn().Str("state", c.Query("state")).Msg("Invalid or expired state during callback")
 				c.String(http.StatusBadRequest, "Invalid or expired state")
 				return
@@ -513,7 +557,12 @@ func main() {
 			}
 
 			log.Info().Interface("user", user).Msg("User logged in successfully")
-			c.Redirect(http.StatusFound, "/")
+			// Checked again on the way out: it came from a query string, and
+			// this is where it becomes a redirect.
+			if safeReturnPath(returnTo) == "" {
+				returnTo = "/"
+			}
+			c.Redirect(http.StatusFound, returnTo)
 		})
 
 		r.GET("/logout", func(c *gin.Context) {

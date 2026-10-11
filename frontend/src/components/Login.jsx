@@ -27,8 +27,15 @@ const Login = () => {
             console.error('Failed to clear session:', error);
         }
 
-        // Redirect to login after clearing data
-        window.location.href = '/login';
+        // Redirect to login after clearing data, handing the backend the page
+        // we are on so the login comes back to it. Without this a shared
+        // search link opened by someone signed out lost its search: the
+        // callback always landed on "/".
+        const { pathname, search, hash } = window.location;
+        const returnTo = `${pathname}${search}${hash}`;
+        window.location.href = returnTo === '/'
+            ? '/login'
+            : `/login?return_to=${encodeURIComponent(returnTo)}`;
     };
 
     return (

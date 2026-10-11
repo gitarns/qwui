@@ -16,12 +16,65 @@ import ExportCSVModal from './components/ExportCSVModal'
 import PatternsModal from './components/PatternsModal'
 import ExportProgress from './components/ExportProgress'
 import Login from './components/Login'
+import { parseUrlState, buildUrlSearch } from './urlState'
 
 
 
 const QUICKWIT_URL = ''
 const MAX_BATCH_SIZE = 10 // Maximum number of parallel aggregation requests
 const SAVED_QUERIES_INDEX = import.meta.env.VITE_SAVED_QUERIES_INDEX || 'qwui'
+
+const showToast = (text, background) => {
+  const notification = document.createElement('div')
+  notification.textContent = text
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${background};
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease-out;
+  `
+  document.body.appendChild(notification)
+
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease-out'
+    setTimeout(() => notification.remove(), 300)
+  }, 3000)
+}
+
+// navigator.clipboard only exists in a secure context (HTTPS or localhost), so
+// a deployment reached over plain HTTP falls back to the selection API.
+const copyToClipboard = async (text) => {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // Permission denied or document not focused: try the fallback.
+    }
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  try {
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    textarea.remove()
+  }
+}
 
 function App() {
   const [indexes, setIndexes] = useState([])
@@ -104,8 +157,10 @@ function App() {
   const [lastSearchQuery, setLastSearchQuery] = useState('') // Track search bar text
   const [currentSearchBarQuery, setCurrentSearchBarQuery] = useState('') // Track current search bar input
   const currentSearchBarQueryRef = useRef('') // Ref for immediate access
-  const hasLoadedFromURL = useRef(false) // Track if we've already loaded from URL
-  const [sharedQueryLoaded, setSharedQueryLoaded] = useState(false) // Track if shared query was just loaded
+  // The search carried by the URL the page was opened with (a shared link),
+  // applied by fetchIndexes once the indexes it names can be checked.
+  const [initialUrlState] = useState(() => parseUrlState(window.location.search))
+  const [sharedQueryLoaded, setSharedQueryLoaded] = useState(false) // Set to run a search once restored state has been committed
   const [vrl, setVrl] = useState('') // VRL code for search transformation
   const [vrlTime, setVrlTime] = useState(null) // Execution time of VRL script
   const [searchTrigger, setSearchTrigger] = useState(0) // Trigger counter to force GraphView refresh
@@ -162,19 +217,7 @@ function App() {
     }
   }, [authStatus.loading, authStatus.oidcEnabled, authStatus.authenticated])
 
-  // Load shared query from URL after indexes are loaded (only once)
-  useEffect(() => {
-    if (indexes.length > 0 && !hasLoadedFromURL.current) {
-      hasLoadedFromURL.current = true
-      const wasLoaded = loadQueryFromURL()
-      // If no shared query was loaded, allow auto-trigger to run
-      if (!wasLoaded) {
-        hasLoadedFromURL.current = false
-      }
-    }
-  }, [indexes])
-
-  // Trigger search when shared query is loaded
+  // Trigger search once a restored history state has been committed
   useEffect(() => {
     if (sharedQueryLoaded && selectedIndex && timeRange) {
       executeSearch(100)
@@ -182,8 +225,10 @@ function App() {
     }
   }, [sharedQueryLoaded, selectedIndex, timeRange, currentQuery])
 
-  // Auto-trigger search on page load when index and time range are ready
-  // Skip if a shared query was loaded (it will trigger its own search)
+  // Auto-trigger search on page load when index and time range are ready.
+  // A search from the URL needs nothing extra: fetchIndexes applies it in the
+  // same batch as the index, so this first search already runs with it.
+  // Skipped while a restored history state is pending (it runs its own).
   useEffect(() => {
     if (selectedIndex && selectedIndex.trim() !== '' && timeRange && !searchResults && indexes.length > 0 && !sharedQueryLoaded) {
       // Trigger initial search with current query (defaults to '*' if not set)
@@ -219,6 +264,20 @@ function App() {
   useEffect(() => {
     currentSearchBarQueryRef.current = currentSearchBarQuery
   }, [currentSearchBarQuery])
+
+  // Keep the address bar in step with the search on screen, as Kibana does,
+  // so it can be copied and shared at any point. Uses the last *run* query,
+  // not what is half-typed in the bar. Waits for an index: until fetchIndexes
+  // has applied an incoming link, writing would erase it. replaceState rather
+  // than pushState, because qwui has its own query history (the ◀ ▶ buttons)
+  // and a browser entry per search would turn Back into an undo button.
+  useEffect(() => {
+    if (!selectedIndex) return
+    const search = buildUrlSearch(currentUrlState())
+    if (search !== window.location.search) {
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${search}${window.location.hash}`)
+    }
+  }, [selectedIndex, currentQuery, filters, timeRange, selectedColumns, histogramInterval, sortOrder, vrl])
 
   // Refetch histogram when ONLY interval changes (search already fetches it in parallel)
   useEffect(() => {
@@ -471,6 +530,34 @@ function App() {
     return timeRange
   }
 
+  // Restores a search read from the URL (see urlState.js). Only the parts the
+  // link carries are touched; the rest keeps its default. Refs are updated
+  // alongside state because executeSearch reads them.
+  const applyUrlState = (urlState) => {
+    if (urlState.query !== undefined) {
+      setCurrentSearchBarQuery(urlState.query)
+      currentSearchBarQueryRef.current = urlState.query
+      setLastSearchQuery(urlState.query)
+      setCurrentQuery(urlState.query)
+    }
+    if (urlState.filters) {
+      setFilters(urlState.filters)
+      filtersRef.current = urlState.filters
+    }
+    if (urlState.timeRange) {
+      const range = recomputeTimeRangeFromLabel(urlState.timeRange)
+      setTimeRange({ ...range })
+      timeRangeRef.current = range
+    }
+    if (urlState.columns) setSelectedColumns(urlState.columns)
+    if (urlState.interval) setHistogramInterval(urlState.interval)
+    if (urlState.sort) {
+      setSortOrder(urlState.sort)
+      sortOrderRef.current = urlState.sort
+    }
+    if (urlState.vrl !== undefined) setVrl(urlState.vrl)
+  }
+
   const loadQuery = (savedQuery) => {
     setSelectedIndex(savedQuery.query.index)
     setLastSearchQuery(savedQuery.query.search_query)
@@ -546,11 +633,25 @@ function App() {
       const data = await response.json()
       setIndexes(data)
       if (data.length > 0) {
+        // A link names its index (several, comma-separated, for a multi-index
+        // search), and that wins over the saved default. Every one of them
+        // must exist, or the link's filters would hit an index they were not
+        // written for.
+        const urlState = initialUrlState
+        const urlIndexIds = urlState?.index ? urlState.index.split(',') : []
+        const urlIndexValid = urlIndexIds.length > 0 &&
+          urlIndexIds.every(id => data.some(idx => idx.index_config.index_id === id))
+        if (urlState?.index && !urlIndexValid) {
+          showToast(`Index "${urlState.index}" from the link does not exist`, '#ef4444')
+        }
+
         // Check if there's a saved default index
         const savedDefaultIndex = localStorage.getItem('defaultIndex')
-        let indexToSelect = null
+        let indexToSelect = urlIndexValid
+          ? data.find(idx => idx.index_config.index_id === urlIndexIds[0])
+          : null
 
-        if (savedDefaultIndex) {
+        if (!indexToSelect && savedDefaultIndex) {
           // Try to find the saved default index
           indexToSelect = data.find(idx => idx.index_config.index_id === savedDefaultIndex)
         }
@@ -563,7 +664,7 @@ function App() {
           indexToSelect = sortedIndexes[0]
         }
 
-        setSelectedIndex(indexToSelect.index_config.index_id)
+        setSelectedIndex(urlIndexValid ? urlState.index : indexToSelect.index_config.index_id)
 
         // Extract timestamp field from index config
         const tsField = indexToSelect.index_config?.doc_mapping?.timestamp_field ||
@@ -575,6 +676,10 @@ function App() {
         const searchFields = indexToSelect.index_config?.search_settings?.default_search_fields || []
         setDefaultSearchFields(searchFields)
 
+        // In the same batch as the index, so the auto-trigger effect's first
+        // search runs once, with the link's whole search. fetchIndexes runs
+        // once per page load, so this cannot clobber a later search.
+        if (urlState) applyUrlState(urlState)
       }
     } catch (err) {
       setError('Failed to fetch indexes: ' + err.message)
@@ -672,127 +777,28 @@ function App() {
     return rangeSeconds / 50
   };
 
-  // URL-based query sharing functions
-  const encodeQueryToURL = () => {
-    const encoded = encodeURIComponent(JSON.stringify(captureCurrentQuery()))
-    const shareUrl = `${window.location.origin}${window.location.pathname}?q=${encoded}`
-    return shareUrl
-  }
+  // The search on screen, in the shape urlState.js reads and writes.
+  const currentUrlState = () => ({
+    index: selectedIndex,
+    query: currentQuery,
+    timeRange,
+    filters,
+    columns: selectedColumns,
+    interval: histogramInterval,
+    sort: sortOrder,
+    vrl
+  })
 
+  // The address bar already holds this link (see the effect that keeps it in
+  // step); the button is the one-click way to copy it.
   const handleShareQuery = async () => {
-    try {
-      const shareUrl = encodeQueryToURL()
-      await navigator.clipboard.writeText(shareUrl)
-
-      // Show success notification
-      const notification = document.createElement('div')
-      notification.textContent = '✓ Query link copied to clipboard!'
-      notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 14px;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        animation: slideIn 0.3s ease-out;
-      `
-      document.body.appendChild(notification)
-
-      setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-out'
-        setTimeout(() => notification.remove(), 300)
-      }, 3000)
-    } catch (error) {
-      console.error('Failed to copy to clipboard', error)
-      alert('Failed to copy link to clipboard')
+    const shareUrl = `${window.location.origin}${window.location.pathname}${buildUrlSearch(currentUrlState())}`
+    if (await copyToClipboard(shareUrl)) {
+      showToast('✓ Query link copied to clipboard!', '#10b981')
+    } else {
+      // No clipboard access at all: hand the link over to copy by hand.
+      window.prompt('Copy this link to share the search:', shareUrl)
     }
-  }
-
-  const loadQueryFromURL = () => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const sharedQuery = urlParams.get('q')
-
-    if (sharedQuery) {
-      try {
-        const queryData = JSON.parse(decodeURIComponent(sharedQuery))
-        // Restore query state
-        if (queryData.index) {
-          setSelectedIndex(queryData.index)
-          // Also restore timestampField from the index config
-          const firstIndex = queryData.index.split(',')[0]
-          const indexObj = indexes.find(idx => idx.index_config.index_id === firstIndex)
-          if (indexObj) {
-            const tsField = indexObj.index_config?.doc_mapping?.timestamp_field ||
-              indexObj.index_config?.indexing_settings?.timestamp_field ||
-              'timestamp'
-            setTimestampField(tsField)
-          }
-        }
-        if (queryData.search_query !== undefined) {
-          setCurrentSearchBarQuery(queryData.search_query)
-          currentSearchBarQueryRef.current = queryData.search_query // Update ref immediately
-          setLastSearchQuery(queryData.search_query)
-          setCurrentQuery(queryData.search_query)
-        }
-        if (queryData.filters) {
-          setFilters(queryData.filters)
-          filtersRef.current = queryData.filters // Update ref immediately
-        }
-        if (queryData.time_range) {
-          // Recompute time range if it's a relative range
-          const timeRange = recomputeTimeRangeFromLabel(queryData.time_range)
-          setTimeRange({ ...timeRange })
-          timeRangeRef.current = timeRange // Update ref immediately
-        }
-        if (queryData.selected_columns) {
-          setSelectedColumns(queryData.selected_columns)
-        }
-        if (queryData.histogram_interval) {
-          setHistogramInterval(queryData.histogram_interval)
-        }
-
-        // Clear URL parameter after loading
-        window.history.replaceState({}, '', window.location.pathname)
-
-        // Show notification
-        const notification = document.createElement('div')
-        notification.textContent = '✓ Shared query loaded!'
-        notification.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #667eea;
-          color: white;
-          padding: 12px 20px;
-          border-radius: 6px;
-          font-weight: 600;
-          font-size: 14px;
-          z-index: 10000;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-          animation: slideIn 0.3s ease-out;
-        `
-        document.body.appendChild(notification)
-
-        setTimeout(() => {
-          notification.style.animation = 'slideOut 0.3s ease-out'
-          setTimeout(() => notification.remove(), 300)
-        }, 3000)
-
-        // Signal that shared query was loaded
-        setSharedQueryLoaded(true)
-
-        return true
-      } catch (error) {
-        console.error('Failed to load shared query', error)
-        return false
-      }
-    }
-    return false
   }
 
   const resolveTimeRange = () => {
