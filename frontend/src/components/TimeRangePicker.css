@@ -335,6 +335,11 @@
   border-left: 1px solid var(--border-color);
 }
 
+/* The library paints this header black, which vanished on the dark theme. */
+.react-datepicker-time__header {
+  color: var(--text-primary);
+}
+
 .react-datepicker__time-box {
   background: var(--bg-secondary);
 }
@@ -433,12 +438,12 @@
   transition: all 0.2s ease;
 }
 
-.apply-btn:hover {
+.apply-btn:hover:not(:disabled) {
   background: #005a9e;
   box-shadow: 0 2px 4px rgba(0, 107, 180, 0.3);
 }
 
-.apply-btn:active {
+.apply-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
 
@@ -476,4 +481,26 @@
   outline: none;
   border-color: #006bb4;
   box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+}
+
+.manual-date-input.invalid,
+.manual-date-input.invalid:focus {
+  border-color: var(--error-text);
+}
+
+.manual-date-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.manual-date-hint.invalid {
+  color: var(--error-text);
+}
+
+.apply-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }
