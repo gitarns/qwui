@@ -31,8 +31,12 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 0.25rem 0.5rem;
-  min-width: 480px;
-  width: 480px;
+  /* Sized to its label rather than a fixed 480px, which the search query paid
+     for on every screen. The floor keeps the 500px quick-select dropdown, which
+     hangs from this box's left edge, inside the window: the Search and Live
+     buttons always sit to the right of it. */
+  min-width: 22rem;
+  white-space: nowrap;
 }
 
 .calendar-quick-select-btn {
@@ -249,6 +253,9 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
   z-index: 1000;
   min-width: 350px;
+  /* Its own width, not the picker's: shrink-to-fit would otherwise cap it at
+     the picker box and push the time list under the calendar. */
+  width: max-content;
   animation: slideDown 0.15s ease-out;
 }
 

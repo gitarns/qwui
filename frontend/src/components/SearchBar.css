@@ -4,18 +4,35 @@
   background-color: var(--bg-tertiary);
 }
 
+/* Wraps rather than squeezing the query: when the row cannot give the query
+   its basis width, the controls drop to a second row, right-aligned, and the
+   query takes the first row whole. Top-aligned so a multi-line query grows
+   downwards without dragging the controls beside it off their line. */
 .search-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
-  align-items: center;
+  align-items: flex-start;
 }
 
+/* The basis is history buttons + query actions + roughly 50 characters of
+   query. Below that, one row would leave too little to type in, so the
+   controls wrap: on a laptop the query gets the full width, on a wide screen
+   everything stays on one line. */
 .search-input-wrapper {
-  flex: 1;
-  position: relative;
+  flex: 1 1 44rem;
+  min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.search-controls {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
 }
 
 .history-navigation {
@@ -79,30 +96,56 @@
   background: #1e1e1e;
 }
 
-.search-input {
-  width: 100%;
-  padding: 0.5rem 16rem 0.5rem 1rem;
+/* The bordered box the user sees as "the search field": textarea, clear
+   button and actions side by side, so the textarea gets every pixel the
+   actions do not use. */
+.search-input-group {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-size: 0.9rem;
-  background-color: var(--input-bg);
-  color: var(--text-primary);
   transition: border-color 0.2s;
+}
+
+.search-input-group:focus-within {
+  border-color: #667eea;
+}
+
+.search-input-group.is-disabled {
+  background-color: var(--border-color-light);
+  cursor: not-allowed;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.5rem 0.4rem 1rem;
+  border: none;
+  font-size: 0.9rem;
+  background: transparent;
+  color: var(--text-primary);
   resize: none;
   overflow: hidden;
   line-height: 1.5;
-  min-height: 2.1rem;
+  /* One line of query (0.9rem x 1.5 + 2 x 0.4rem padding), so with the
+     group's border the field is as tall as the time picker and buttons beside
+     it. Shared with .search-actions and the clear button so they centre
+     against the first line. */
+  min-height: 2.15rem;
   box-sizing: border-box;
 }
 
 .search-actions {
-  position: absolute;
-  right: 0.5rem;
-  top: 0.35rem;
+  flex-shrink: 0;
+  height: 2.15rem;
+  padding-right: 0.5rem;
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  z-index: 100;
 }
 
 .search-info-icon {
@@ -164,40 +207,38 @@
 }
 
 .clear-search-button {
-  position: absolute;
-  right: 14rem;
-  top: 50%;
-  transform: translateY(-50%);
+  flex-shrink: 0;
+  height: 2.15rem;
+  display: flex;
+  align-items: center;
   background: none;
   border: none;
   color: var(--text-tertiary);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
+  padding: 0 0.5rem;
   transition: color 0.2s;
-  z-index: 1;
 }
 
 .clear-search-button:hover {
   color: var(--text-primary);
 }
 
+/* The group draws the focus and disabled states. */
 .search-input:focus {
   outline: none;
-  border-color: #667eea;
 }
 
 .search-input:disabled {
-  background-color: var(--border-color-light);
   cursor: not-allowed;
 }
 
 .search-suggestions {
   position: absolute;
   top: 100%;
-  left: 0;
-  right: 0;
+  left: -1px;
+  right: -1px;
   background-color: var(--bg-primary);
   border: 2px solid var(--border-color);
   border-top: none;
