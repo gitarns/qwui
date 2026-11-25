@@ -517,7 +517,7 @@ function GraphView({ selectedIndex, apiUrl, startTime, endTime, filters = [], ti
       }
 
       const requestStartTime = performance.now()
-      const response = await fetch(`${apiUrl}/quickwit/api/v1/${selectedIndex}/search`, {
+      const response = await fetch(`${apiUrl}/quickwit/api/v1/${encodeURIComponent(selectedIndex)}/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
