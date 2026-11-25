@@ -12,9 +12,7 @@ use axum_reverse_proxy::ReverseProxy;
 use dotenvy::dotenv;
 use hyper_util::client::legacy::{connect::HttpConnector, Client};
 use openidconnect::{
-    core::{CoreClient, CoreProviderMetadata, CoreResponseType},
-    AuthenticationFlow, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, RedirectUrl, Scope,
-    TokenResponse,
+    core::CoreResponseType, AuthenticationFlow, CsrfToken, Nonce, Scope, TokenResponse,
 };
 use reqwest::{header, Client as ReqwestClient};
 use serde::{Deserialize, Serialize};
@@ -41,6 +39,7 @@ use std::collections::HashMap;
 
 mod mcp;
 mod metrics;
+mod oidc;
 
 /// StateStore manages OIDC state tokens with expiration
 #[derive(Clone)]
@@ -83,10 +82,11 @@ impl StateStore {
 struct AppState {
     config: Config,
     client: ReqwestClient,
-    oidc_client: Option<CoreClient>,
-    // RP-initiated logout endpoint, discovered at startup. None when the
-    // provider does not advertise one.
-    oidc_end_session: Option<String>,
+    // Filled by the background discovery (oidc::spawn_discovery); empty while
+    // the provider has not been reached, or when OIDC is disabled.
+    oidc: oidc::ProviderCell,
+    // qwui's own HTTP client to the provider (internal URL, extra CA).
+    oidc_http: Option<oidc::OidcHttp>,
     state_store: StateStore,
 }
 
@@ -102,6 +102,10 @@ struct Config {
     oidc_issuer: String,
     oidc_redirect: String,
     oidc_post_logout: String,
+    // Base URL replacing OIDC_ISSUER in qwui's own calls to the provider.
+    oidc_internal_url: Option<String>,
+    // PEM bundle trusted in addition to the system CAs for those calls.
+    oidc_ca_file: Option<String>,
     session_secret: Option<String>,
     // Whether the session cookie carries the `Secure` attribute. Inferred from
     // the OIDC redirect URL's scheme, overridable with SESSION_COOKIE_SECURE.
@@ -127,6 +131,8 @@ impl Config {
             oidc_issuer: env::var("OIDC_ISSUER").unwrap_or_default(),
             oidc_redirect: env::var("OIDC_REDIRECT_URL").unwrap_or_default(),
             oidc_post_logout: env::var("OIDC_POST_LOGOUT_REDIRECT_URL").unwrap_or_default(),
+            oidc_internal_url: env::var("OIDC_INTERNAL_URL").ok().filter(|v| !v.is_empty()),
+            oidc_ca_file: env::var("OIDC_CA_FILE").ok().filter(|v| !v.is_empty()),
             session_secret: env::var("SESSION_SECRET").ok(),
             session_cookie_secure: match env::var("SESSION_COOKIE_SECURE") {
                 Ok(v) => v == "true",
@@ -306,8 +312,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    let mut oidc_client = None;
-    let mut oidc_end_session: Option<String> = None;
+    let oidc_cell: oidc::ProviderCell = Default::default();
+    let mut oidc_http = None;
     if config.oidc_enabled {
         if config.oidc_client_id.is_empty()
             || config.oidc_secret.is_empty()
@@ -316,59 +322,34 @@ async fn main() -> Result<()> {
         {
             anyhow::bail!("OIDC is enabled but missing configuration");
         }
-
-        let provider_metadata = CoreProviderMetadata::discover_async(
-            IssuerUrl::new(config.oidc_issuer.clone())?,
-            openidconnect::reqwest::async_http_client,
-        )
-        .await?;
-
-        oidc_client = Some(
-            CoreClient::from_provider_metadata(
-                provider_metadata,
-                ClientId::new(config.oidc_client_id.clone()),
-                Some(ClientSecret::new(config.oidc_secret.clone())),
-            )
-            .set_redirect_uri(RedirectUrl::new(config.oidc_redirect.clone())?),
-        );
-
-        // openidconnect's CoreProviderMetadata does not surface
-        // end_session_endpoint, so read it straight from the discovery
-        // document. Optional: providers without it fall back to a local-only
-        // session clear at logout.
-        let discovery_url = format!(
-            "{}/.well-known/openid-configuration",
-            config.oidc_issuer.trim_end_matches('/')
-        );
-        oidc_end_session = match client.get(&discovery_url).send().await {
-            Ok(resp) => match resp.json::<Value>().await {
-                Ok(doc) => doc
-                    .get("end_session_endpoint")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                Err(e) => {
-                    error!("Could not parse OIDC discovery document: {}", e);
-                    None
-                }
-            },
-            Err(e) => {
-                error!("Could not fetch OIDC discovery document: {}", e);
-                None
-            }
-        };
-        match &oidc_end_session {
-            Some(url) => info!("RP-initiated logout available: {}", url),
-            None => error!(
-                "Provider advertises no end_session_endpoint: logout will only clear the local session, the provider SSO session will survive"
-            ),
-        }
+        // Configuration errors stop the server; an unreachable provider does
+        // not (discovery retries in the background, /ready reports it).
+        let settings = oidc::Settings::new(
+            &config.oidc_issuer,
+            &config.oidc_redirect,
+            &config.oidc_client_id,
+            &config.oidc_secret,
+        )?;
+        let http = oidc::OidcHttp::new(
+            &config.oidc_issuer,
+            config.oidc_internal_url.as_deref(),
+            config.oidc_ca_file.as_deref(),
+        )?;
+        println!("{}", serde_json::json!({
+            "type": "startup", "timestamp": now, "message": "OIDC provider access",
+            "issuer": config.oidc_issuer,
+            "internal_url": config.oidc_internal_url,
+            "ca_file": config.oidc_ca_file,
+        }));
+        oidc::spawn_discovery(settings, http.clone(), oidc_cell.clone());
+        oidc_http = Some(http);
     }
 
     let state = AppState {
         config: config.clone(),
         client,
-        oidc_client,
-        oidc_end_session,
+        oidc: oidc_cell,
+        oidc_http,
         state_store: StateStore::new(),
     };
 
@@ -426,6 +407,7 @@ async fn main() -> Result<()> {
         .merge(protected_api_routes);
 
     let auth_routes = Router::new()
+        .route("/ready", get(ready_handler))
         .route("/login", get(login_handler))
         .route("/auth/callback", get(auth_callback))
         .route("/logout", get(logout_handler))
@@ -563,9 +545,12 @@ async fn login_handler(
     session: Session,
     Query(params): Query<LoginParams>,
 ) -> impl IntoResponse {
-    let client = match app_state.oidc_client {
-        Some(c) => c,
-        None => return (StatusCode::INTERNAL_SERVER_ERROR, "OIDC not enabled").into_response(),
+    if !app_state.config.oidc_enabled {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "OIDC not enabled").into_response();
+    }
+    let client = match app_state.oidc.get() {
+        Some(p) => &p.client,
+        None => return provider_unavailable(),
     };
 
     let (auth_url, csrf_token, nonce) = client
@@ -620,10 +605,13 @@ async fn auth_callback(
 
     let stored_nonce: Option<String> = session.get("oidc_nonce").await.unwrap();
 
-    let client = app_state.oidc_client.unwrap();
+    let (client, http) = match (app_state.oidc.get(), app_state.oidc_http.as_ref()) {
+        (Some(p), Some(h)) => (&p.client, h.clone()),
+        _ => return provider_unavailable(),
+    };
     let token_response = match client
         .exchange_code(openidconnect::AuthorizationCode::new(params.code))
-        .request_async(openidconnect::reqwest::async_http_client)
+        .request_async(move |req| async move { http.execute(req).await })
         .await
     {
         Ok(token) => token,
@@ -708,7 +696,7 @@ async fn logout_handler(
     // Clearing our cookie is not a logout: the provider keeps its own SSO
     // session, so the next /login would silently re-authenticate. Hand the
     // user to the provider so it ends its session too.
-    let end_session = match &app_state.oidc_end_session {
+    let end_session = match app_state.oidc.get().and_then(|p| p.end_session.as_ref()) {
         Some(e) => e,
         None => return Redirect::to("/").into_response(),
     };
@@ -735,6 +723,25 @@ async fn logout_handler(
     }
 
     Redirect::to(url.as_str()).into_response()
+}
+
+/// The provider has not been discovered yet (unreachable at startup).
+fn provider_unavailable() -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        [(header::RETRY_AFTER, "10")],
+        "The identity provider is not reachable yet, retry in a few seconds",
+    )
+        .into_response()
+}
+
+/// Readiness: 503 while OIDC is enabled and its provider not yet discovered.
+async fn ready_handler(State(state): State<AppState>) -> impl IntoResponse {
+    if state.config.oidc_enabled && state.oidc.get().is_none() {
+        (StatusCode::SERVICE_UNAVAILABLE, "waiting for OIDC discovery").into_response()
+    } else {
+        (StatusCode::OK, "ready").into_response()
+    }
 }
 
 async fn auth_status(State(state): State<AppState>, session: Session) -> impl IntoResponse {
