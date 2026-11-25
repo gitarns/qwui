@@ -1,4 +1,4 @@
-.PHONY: dev dev-go dev-rust down logs
+.PHONY: dev dev-backend down logs test quickwit-api-surface
 
 # Quickwit + data generator only (run backend locally)
 dev:
@@ -6,17 +6,11 @@ dev:
 	docker network prune -f
 	docker compose up -d
 
-# Quickwit + Go backend + data generator
-dev-go:
+# Quickwit + backend + data generator
+dev-backend:
 	docker compose down -v --remove-orphans
 	docker network prune -f
-	docker compose --profile go up -d
-
-# Quickwit + Rust backend + data generator
-dev-rust:
-	docker compose down -v --remove-orphans
-	docker network prune -f
-	docker compose --profile rust up -d
+	docker compose --profile backend up -d
 
 # Stop everything and wipe volumes
 down:
@@ -28,14 +22,20 @@ down:
 logs:
 	docker compose logs -f
 
-# Run Go backend locally (requires Quickwit running)
-run-go:
-	cd go-backend && QUICKWIT_URL=http://localhost:7280 go run .
-
-# Run Rust backend locally (requires Quickwit running)
-run-rust:
+# Run the backend locally (requires Quickwit running)
+run-backend:
 	cd rust-backend && QUICKWIT_URL=http://localhost:7280 cargo run
 
 # Run frontend dev server
 run-frontend:
 	cd frontend && npm run dev
+
+# Backend tests, including the MCP read-only and Quickwit API drift checks
+test:
+	cd rust-backend && cargo test
+
+# Re-vendor Quickwit's API surface after upgrading Quickwit, then verify the MCP
+# tools still match it. Needs a reachable Quickwit (QUICKWIT_URL, default :7280).
+quickwit-api-surface:
+	python ci/refresh-quickwit-api-surface.py $(or $(QUICKWIT_URL),http://localhost:7280)
+	cd rust-backend && cargo test

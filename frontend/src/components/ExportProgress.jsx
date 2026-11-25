@@ -1,30 +1,27 @@
 import './ExportProgress.css'
+import { IconHourglass, IconCheck, IconX } from './Icon'
 
 function ExportProgress({ status, message, progress }) {
   const getStatusIcon = () => {
     switch (status) {
-      case 'fetching':
-      case 'converting':
-      case 'compressing':
-      case 'downloading':
-        return '⏳'
       case 'complete':
-        return '✓'
+        return <IconCheck />
       case 'error':
-        return '✗'
+        return <IconX />
+      // fetching, converting, compressing and downloading all read as in-progress
       default:
-        return '⏳'
+        return <IconHourglass />
     }
   }
 
   const getStatusColor = () => {
     switch (status) {
       case 'complete':
-        return '#10b981'
+        return 'var(--color-success)'
       case 'error':
-        return '#ef4444'
+        return 'var(--color-danger)'
       default:
-        return '#006bb4'
+        return 'var(--color-primary)'
     }
   }
 

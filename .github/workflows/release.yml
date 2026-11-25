@@ -19,20 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: qwui-go
-            dockerfile: Dockerfile.go
+          - image: qwui
+            dockerfile: Dockerfile
             platform: linux/amd64
             runner: ubuntu-latest
-          - image: qwui-go
-            dockerfile: Dockerfile.go
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-          - image: qwui-rust
-            dockerfile: Dockerfile.rust
-            platform: linux/amd64
-            runner: ubuntu-latest
-          - image: qwui-rust
-            dockerfile: Dockerfile.rust
+          - image: qwui
+            dockerfile: Dockerfile
             platform: linux/arm64
             runner: ubuntu-24.04-arm
 
@@ -85,7 +77,7 @@ jobs:
 
     strategy:
       matrix:
-        image: [qwui-go, qwui-rust]
+        image: [qwui]
 
     steps:
       - name: Download digests

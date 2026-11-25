@@ -1,44 +1,34 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* The element reset now lives in index.css, alongside the base layer. */
 
+/* Legacy token names, kept as aliases onto the semantic layer in
+   styles/tokens.css. Components still reading these keep working and pick up
+   the new light/dark behaviour for free; new code should use the --color-*
+   names directly.
+
+   The .dark-mode block that used to sit here is deliberately gone. Two
+   competing theme definitions is precisely what let dark mode drift: 9 of
+   these tokens -- including --primary-color, --primary-hover and
+   --primary-color-alpha -- were never overridden for dark at all, so the
+   purple primary rendered identically in both themes. The theme is now
+   defined once, in tokens.css. */
 :root {
-  --bg-primary: #f5f7fa;
-  --bg-secondary: white;
-  --bg-tertiary: #fafbfc;
-  --text-primary: #374151;
-  --text-secondary: #4b5563;
-  --text-tertiary: #6b7280;
-  --border-color: #e5e7eb;
-  --border-color-light: #f3f4f6;
-  --header-bg: #667eea;
-  --error-bg: #fee;
-  --error-text: #c33;
-  --error-border: #c33;
-  --input-bg: white;
-  --input-border: #d1d5db;
-  --primary-color: #667eea;
-  --primary-hover: #5a67d8;
-  --primary-color-alpha: rgba(102, 126, 234, 0.5);
-}
-
-.dark-mode {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2d2d2d;
-  --bg-tertiary: #242424;
-  --text-primary: #f3f4f6;
-  --text-secondary: #e5e7eb;
-  --text-tertiary: #d1d5db;
-  --border-color: #404040;
-  --border-color-light: #333333;
-  --header-bg: #4a5568;
-  --error-bg: #3d1a1a;
-  --error-text: #ff6b6b;
-  --error-border: #c33;
-  --input-bg: #3d3d3d;
-  --input-border: #555555;
+  --bg-primary: var(--color-canvas);
+  --bg-secondary: var(--color-surface);
+  --bg-tertiary: var(--color-surface-sunken);
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-muted);
+  --text-tertiary: var(--color-text-subtle);
+  --border-color: var(--color-border);
+  --border-color-light: var(--color-divider);
+  --header-bg: var(--color-surface);
+  --error-bg: var(--color-brand-wash);
+  --error-text: var(--color-danger);
+  --error-border: var(--color-danger);
+  --input-bg: var(--color-surface);
+  --input-border: var(--color-border-strong);
+  --primary-color: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  --primary-color-alpha: var(--color-primary-wash);
 }
 
 .app {
@@ -48,49 +38,93 @@
   background-color: var(--bg-primary);
 }
 
+/* A neutral surface with a hairline rule, the way data tools are built now.
+   The old solid indigo bar forced white text, which is why every control in
+   here hardcoded rgba(255, 255, 255, ...) and had no light-mode equivalent. */
 .header {
-  background: var(--header-bg);
-  color: white;
-  padding: 0.5rem 2rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0 var(--space-5);
+  min-height: var(--header-height);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header h1 {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: var(--space-5);
+  min-width: 0;
 }
 
+/* Brand lock-up */
+.qw-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.qw-logo__word {
+  font-family: var(--qw-font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+/* Segmented control. These buttons used to be white-on-translucent, which only
+   worked against the old indigo header bar: on the neutral header they were
+   white on white and Visualize and Traces vanished entirely. */
 .view-mode-buttons {
-  display: flex;
-  gap: 0.5rem;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background-color: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .view-mode-btn {
-  padding: 0.375rem 0.875rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
-.view-mode-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+.view-mode-btn:hover:not(.active) {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
+/* The selected segment lifts onto the surface colour rather than changing hue,
+   so the control reads at a glance in both themes. */
 .view-mode-btn.active {
-  background-color: white;
-  color: #667eea;
-  border-color: white;
-  font-weight: 600;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
+  box-shadow: var(--shadow-sm);
 }
 
 .dark-mode-toggle {
@@ -113,11 +147,7 @@
   font-weight: 600;
 }
 
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
+/* .header-controls is declared once, further down. */
 
 .index-selector {
   display: flex;
@@ -127,7 +157,7 @@
 
 .index-selector label {
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text);
   font-size: 0.875rem;
 }
 
@@ -144,12 +174,15 @@
 
 .index-selector select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
+/* Dead: no element carries the class `index-selector` any more -- the index
+   picker moved into the sidebar as `sidebar-index-selector`. Kept, but no longer
+   painting white text that would be invisible on the neutral header. */
 .header .index-selector label {
-  color: white;
+  color: var(--color-text-muted);
 }
 
 .header .index-selector select {
@@ -207,27 +240,27 @@
 }
 
 .filter-chip.include {
-  background-color: #d1fae5;
-  color: #065f46;
-  border: 1px solid #10b981;
+  background-color: var(--color-success-wash);
+  color: var(--color-on-success-wash);
+  border: 1px solid var(--color-success);
 }
 
 .filter-chip.exclude {
-  background-color: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #ef4444;
+  background-color: var(--color-danger-wash);
+  color: var(--color-on-danger-wash);
+  border: 1px solid var(--color-danger);
 }
 
 .filter-chip.exists {
-  background-color: #dbeafe;
-  color: #1e40af;
-  border: 1px solid #3b82f6;
+  background-color: var(--color-primary-wash);
+  color: var(--color-on-info-wash);
+  border: 1px solid var(--color-info);
 }
 
 .filter-chip.not_exists {
-  background-color: #fef3c7;
-  color: #92400e;
-  border: 1px solid #f59e0b;
+  background-color: var(--color-warning-wash);
+  color: var(--color-on-warning-wash);
+  border: 1px solid var(--color-warning);
 }
 
 .filter-content {
@@ -423,13 +456,13 @@
 .filter-edit-inputs input:focus,
 .filter-edit-inputs select:focus {
   outline: none;
-  border-color: #006bb4;
-  box-shadow: 0 0 0 2px rgba(0, 107, 180, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
 .filter-edit-inputs input:hover,
 .filter-edit-inputs select:hover {
-  border-color: #9ca3af;
+  border-color: var(--color-text-subtle);
 }
 
 .filter-edit-actions {
@@ -457,18 +490,18 @@
 
 .filter-edit-cancel:hover {
   background: var(--bg-secondary);
-  border-color: #9ca3af;
+  border-color: var(--color-text-subtle);
 }
 
 .filter-edit-save {
-  background: #006bb4;
-  color: white;
-  border-color: #006bb4;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
 }
 
 .filter-edit-save:hover {
-  background: #0079cc;
-  box-shadow: 0 2px 4px rgba(0, 107, 180, 0.2);
+  background: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .filter-edit-save:active {
@@ -527,26 +560,35 @@
 /* Header Controls */
 .header-controls {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   align-items: center;
+  flex: 0 0 auto;
 }
 
 /* Settings Toggle Button */
-.settings-toggle {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-  display: flex;
+/* Square icon buttons. The old rules sized a 1.25rem emoji glyph; these hold a
+   16px SVG on a fixed box, so every header control shares one baseline. */
+.settings-toggle,
+.theme-toggle-btn {
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
-.settings-toggle:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+.settings-toggle:hover,
+.theme-toggle-btn:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 /* Settings Modal */
@@ -568,7 +610,7 @@
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
   z-index: 1000;
   width: 90%;
   max-width: 600px;
@@ -656,7 +698,7 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #667eea;
+  accent-color: var(--color-primary);
 }
 
 .settings-item select {
@@ -672,18 +714,8 @@
 
 .settings-item select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
-}
-
-.dark-mode .settings-item select {
-  background-color: var(--input-bg);
-  border-color: var(--border-color);
-}
-
-.dark-mode .settings-item select:focus {
-  border-color: #8b9dc3;
-  box-shadow: 0 0 0 2px rgba(139, 157, 195, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
 /* Share query notification animations */
@@ -715,74 +747,68 @@
 .theme-toggle-container {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-2);
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding-right: 1rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  gap: var(--space-2);
+  padding-right: var(--space-3);
+  border-right: 1px solid var(--color-border);
 }
 
 .user-name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: white;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  /* A long SSO display name must not push the controls off the header. */
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .logout-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.8);
-  transition: color 0.2s;
-  padding: 0.25rem;
-  border-radius: 4px;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
 .logout-btn:hover {
-  color: white;
-  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-danger);
+  background-color: var(--color-surface-hover);
+  text-decoration: none;
 }
 
-.theme-toggle-btn {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
-.theme-toggle-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
+/* .theme-toggle-btn is styled with .settings-toggle further up: both are the
+   same square icon button. */
 /* ── patterns modal ── */
 .patterns-modal { width: 680px; max-height: 80vh; display: flex; flex-direction: column; }
 .patterns-header-left { display: flex; align-items: baseline; gap: 10px; }
 .patterns-header-right { display: flex; align-items: center; gap: 8px; }
-.patterns-subtitle { font-size: 12px; color: var(--text-muted, #888); }
-.patterns-field-select { font-size: 12px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color, #ccc); background: var(--bg-secondary, #fff); color: var(--text-color, #333); }
+.patterns-subtitle { font-size: 12px; color: var(--text-muted, var(--color-text-subtle)); }
+.patterns-field-select { font-size: 12px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color, var(--color-border-strong)); background: var(--color-surface); color: var(--text-color, var(--color-text)); }
 .patterns-content { overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
-.patterns-loading, .patterns-error, .patterns-empty { padding: 24px; text-align: center; color: var(--text-muted, #888); }
-.patterns-error { color: #e05; }
-.pattern-card { border: 1px solid var(--border-color, #e0e0e0); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.patterns-loading, .patterns-error, .patterns-empty { padding: 24px; text-align: center; color: var(--text-muted, var(--color-text-subtle)); }
+.patterns-error { color: var(--color-danger); }
+.pattern-card { border: 1px solid var(--border-color, var(--color-border)); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .pattern-card-header { display: flex; align-items: center; gap: 10px; }
 .pattern-pct { font-weight: 600; font-size: 14px; min-width: 52px; }
-.pattern-count { font-size: 12px; color: var(--text-muted, #888); flex: 1; }
-.pattern-sample-btn { font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color, #ccc); background: transparent; cursor: pointer; color: var(--text-color, #333); }
-.pattern-sample-btn:hover { background: var(--hover-bg, #f0f0f0); }
-.pattern-sample { font-family: monospace; font-size: 11px; margin-top: 4px; padding: 8px; background: var(--bg-secondary, #f5f5f5); border-radius: 4px; word-break: break-all; white-space: pre-wrap; color: var(--text-muted, #555); }
+.pattern-count { font-size: 12px; color: var(--text-muted, var(--color-text-subtle)); flex: 1; }
+.pattern-sample-btn { font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color, var(--color-border-strong)); background: transparent; cursor: pointer; color: var(--text-color, var(--color-text)); }
+.pattern-sample-btn:hover { background: var(--hover-bg, var(--color-surface-hover)); }
+.pattern-sample { font-family: var(--qw-font-mono); font-size: 11px; margin-top: 4px; padding: 8px; background: var(--bg-secondary, var(--color-surface-sunken)); border-radius: 4px; word-break: break-all; white-space: pre-wrap; color: var(--text-muted, var(--color-text-muted)); }
 .pattern-bar-row { width: 100%; }
-.pattern-bar-track { width: 100%; height: 4px; border-radius: 2px; background: var(--border-color, #e0e0e0); }
-.pattern-bar-fill { height: 100%; border-radius: 2px; background: #4a9eff; }
-.pattern-template { font-family: monospace; font-size: 12px; word-break: break-all; line-height: 1.5; }
-.pattern-wildcard { color: #e07b20; font-weight: 600; }
+.pattern-bar-track { width: 100%; height: 4px; border-radius: 2px; background: var(--border-color, var(--color-border)); }
+.pattern-bar-fill { height: 100%; border-radius: 2px; background: var(--color-primary); }
+.pattern-template { font-family: var(--qw-font-mono); font-size: 12px; word-break: break-all; line-height: 1.5; }
+.pattern-wildcard { color: var(--color-warning); font-weight: 600; }
 .query-action-btn.patterns-btn { font-size: 16px; }

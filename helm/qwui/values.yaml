@@ -1,8 +1,8 @@
 replicaCount: 1
 
 image:
-  # Use qwui-go or qwui-rust image
-  repository:  ghcr.io/gitarns/qwui-go
+  # The Rust backend is the only one.
+  repository: ghcr.io/gitarns/qwui
   pullPolicy: IfNotPresent
   # Defaults to chart appVersion
   tag: ""

@@ -18,25 +18,28 @@
 }
 
 .version-notification-content {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+  color: var(--color-on-primary);
   padding: 12px 16px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
   font-size: 14px;
 }
 
 .version-notification-message {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   flex: 1;
   font-weight: 500;
 }
 
 .version-notification-btn {
-  background: white;
-  color: #667eea;
+  background: var(--color-surface);
+  color: var(--color-primary);
   border: none;
   padding: 6px 12px;
   border-radius: 4px;
@@ -47,7 +50,7 @@
 }
 
 .version-notification-btn:hover {
-  background: #f0f0f0;
+  background: var(--color-surface-hover);
   transform: scale(1.05);
 }
 
@@ -55,16 +58,4 @@
   transform: scale(0.98);
 }
 
-/* Dark mode support */
-.dark-mode .version-notification-content {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
 
-.dark-mode .version-notification-btn {
-  background: #2a2a2a;
-  color: #667eea;
-}
-
-.dark-mode .version-notification-btn:hover {
-  background: #3a3a3a;
-}

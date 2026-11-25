@@ -1,0 +1,324 @@
+/* ==========================================================================
+   qwui design tokens
+   --------------------------------------------------------------------------
+   Three layers, in order:
+     1. PRIMITIVES  raw scales. Never referenced by components.
+     2. SEMANTIC    roles (surface, text, border...). What components use.
+     3. COMPONENT   sizes for recurring parts (table rows, header, controls).
+
+   Rules:
+     - Components read layer 2 and 3 only. A raw hex or a --qw-* primitive
+       inside a component file is a bug: that is exactly what let the dark
+       theme drift before (89 distinct hex values and 70 duplicated
+       .dark-mode override blocks across 9 files).
+     - Only this file knows the difference between light and dark. A theme
+       override anywhere else re-creates that drift.
+     - Every text/background pair is checked against WCAG AA (4.5:1), or 3:1
+       for non-essential text. Measured ratios are noted inline.
+   ========================================================================== */
+
+/* ---------- 1. PRIMITIVES ------------------------------------------------ */
+
+:root {
+  /* Brand red, taken from the logo supplied for this project (#D93134;
+     hue 359, saturation 69%). Note this is not the red on quickwit.io, which is
+     #FF0026 -- the project's own asset wins.
+
+     The pure tone scores 4.73:1 on white but only 4.45:1 on our light canvas and
+     3.71:1 on the dark surface, so it is reserved for the mark itself, a graphic
+     and therefore exempt from text contrast. UI text uses the two tuned steps,
+     derived from the same hue and saturation so the family holds together. */
+  --qw-brand-pure: #d93134;
+  --qw-brand-ink: #bd2326;  /* 6.12:1 on white, 5.76:1 on the canvas */
+  --qw-brand-lift: #e26466; /* 5.22:1 on #161922, 5.61:1 on #0F1117  */
+  --qw-brand-wash-light: rgba(189, 35, 38, 0.08);
+  --qw-brand-wash-dark: rgba(226, 100, 102, 0.16);
+
+  /* Neutrals - slightly cool, so the red accent stays the only warm note */
+  --qw-n-0: #ffffff;
+  --qw-n-25: #f7f8fa;
+  --qw-n-50: #eef0f4;
+  --qw-n-100: #e3e6eb;
+  --qw-n-200: #c9ced6;
+  --qw-n-300: #a7aeb9;
+  /* n-400 was #767e89, which reached 4.10:1 on white and fell to 3.60:1 on the
+     sunken surface -- so the one step used for badges, chevrons and
+     placeholders never actually cleared AA anywhere it was painted. Darkened
+     until it clears 4.5:1 on the *worst* surface it lands on rather than on
+     white only. */
+  --qw-n-400: #646b76;
+  --qw-n-500: #5a616b;
+  --qw-n-600: #3f454e;
+  --qw-n-700: #2a2f3c;
+  --qw-n-800: #1d212c;
+  --qw-n-850: #161922;
+  --qw-n-900: #0f1117;
+  --qw-n-950: #06101f;
+
+  /* Functional ramps. Two steps each: -ink for light, -lift for dark. */
+  --qw-blue-ink: #2563eb;
+  --qw-blue-ink-hover: #1d4ed8;
+  --qw-blue-lift: #5b9bff;
+  --qw-blue-lift-hover: #7fb0ff;
+  --qw-blue-wash-light: rgba(37, 99, 235, 0.08);
+  --qw-blue-wash-dark: rgba(91, 155, 255, 0.16);
+
+  --qw-red-ink: #c62828;
+  --qw-red-lift: #f87171;
+  --qw-green-ink: #157e3c; /* was #15803d: 4.40:1 on sunken, just under AA */
+  --qw-green-lift: #4ade80;
+  --qw-amber-ink: #9a5b00;
+  --qw-amber-ink-hover: #7d4a00;
+  --qw-amber-lift: #fbbf24;
+  --qw-amber-lift-hover: #fcd34d;
+
+  /* Deep steps for text sitting on a -wash tint. A wash is only 8-10% alpha,
+     so it barely darkens the surface, and the matching -ink step lands around
+     4.4-5.0:1 on it -- passable but thin for the 13px semibold text that
+     actually goes in a chip. These are the tones the chips had hardcoded
+     (6.2-7.8:1 on their own tint); they are kept, but as tokens, so the dark
+     theme gets its own value instead of inheriting a near-black on near-black. */
+  --qw-green-deep: #065f46;
+  --qw-red-deep: #991b1b;
+  --qw-blue-deep: #1e40af;
+  --qw-amber-deep: #92400e;
+
+  /* Type. IBM Plex Sans for the interface, JetBrains Mono for log content:
+     log lines need a fixed advance width so timestamps and columns align. */
+  --qw-font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --qw-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono',
+    Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* Dense-dashboard scale. 12px is the floor - nothing smaller gets labelled. */
+  --text-xs: 0.75rem;    /* 12px  badges, table meta     */
+  --text-sm: 0.8125rem;  /* 13px  dense rows, toolbars   */
+  --text-base: 0.875rem; /* 14px  default interface size */
+  --text-md: 1rem;       /* 16px  emphasised body        */
+  --text-lg: 1.125rem;   /* 18px  panel titles           */
+  --text-xl: 1.375rem;   /* 22px  page titles            */
+  --text-2xl: 1.75rem;   /* 28px  login heading          */
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.4;
+  --leading-normal: 1.5;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Spacing - dense end of the scale, 4px base */
+  --space-1: 0.25rem; /*  4 */
+  --space-2: 0.5rem;  /*  8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem;    /* 16 */
+  --space-5: 1.5rem;  /* 24 */
+  --space-6: 2rem;    /* 32 */
+  --space-7: 3rem;    /* 48 */
+
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-pill: 999px;
+
+  /* Motion. Short, because this is a tool used all day: past roughly 200ms a
+     control starts to feel like lag rather than feedback. */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --focus-width: 2px;
+  --focus-offset: 2px;
+}
+
+/* ---------- 2. SEMANTIC - LIGHT (default) -------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces, furthest back to closest to the reader */
+  --color-canvas: var(--qw-n-25);
+  --color-surface: var(--qw-n-0);
+  --color-surface-sunken: var(--qw-n-50);
+  --color-surface-raised: var(--qw-n-0);
+  --color-surface-hover: var(--qw-n-50);
+  --color-surface-active: var(--qw-n-100);
+  --color-overlay: rgba(15, 17, 23, 0.45);
+
+  /* Text. Two ratios are quoted: on the surface, and on the darkest surface the
+     role can legitimately land on (--color-surface-active). The second number
+     is the one that matters -- quoting only the first is what let every step
+     here look compliant while failing in the sidebar and the table, which are
+     painted on sunken and hover, not on white. */
+  --color-text: #14161a;                /* 18.11:1 surface / 14.48:1 active */
+  --color-text-muted: var(--qw-n-500);  /*  6.26:1 / 5.00:1                 */
+  --color-text-subtle: var(--qw-n-400); /*  5.38:1 / 4.30:1 - meta          */
+  --color-text-inverse: var(--qw-n-0);
+  --color-text-on-accent: var(--qw-n-0);
+
+  /* Lines */
+  --color-border: var(--qw-n-100);
+  --color-border-strong: var(--qw-n-200);
+  --color-divider: var(--qw-n-50);
+
+  /* Primary action - blue, deliberately not the brand red: red on a control
+     reads as destructive and would collide with the error state. */
+  --color-primary: var(--qw-blue-ink);
+  --color-primary-hover: var(--qw-blue-ink-hover);
+  --color-primary-wash: var(--qw-blue-wash-light);
+  --color-on-primary: var(--qw-n-0);
+
+  /* Brand accent - identity only: active markers, selected indicators. Never a
+     button fill. The mark itself carries its colour inside
+     public/qwui-mark.svg, so there is no token for it. */
+  --color-brand: var(--qw-brand-ink);
+  --color-brand-wash: var(--qw-brand-wash-light);
+
+  /* Status */
+  --color-danger: var(--qw-red-ink);
+  --color-success: var(--qw-green-ink);
+  --color-warning: var(--qw-amber-ink);
+  --color-warning-hover: var(--qw-amber-ink-hover);
+  --color-info: var(--qw-blue-ink);
+
+  /* Status tints, for the background of a banner or a badge. Kept as alpha
+     over the surface so they sit correctly on canvas and on cards alike. */
+  --color-danger-wash: rgba(198, 40, 40, 0.08);
+  --color-success-wash: rgba(21, 128, 61, 0.1);
+  --color-warning-wash: rgba(154, 91, 0, 0.1);
+
+  /* Text and borders drawn *on* the matching wash. Use these, not the plain
+     status colour, whenever a chip or banner sits on its own tint. */
+  --color-on-danger-wash: var(--qw-red-deep);    /* 7.33:1 on the tint */
+  --color-on-success-wash: var(--qw-green-deep); /* 6.71:1             */
+  --color-on-info-wash: var(--qw-blue-deep);     /* 7.84:1             */
+  --color-on-warning-wash: var(--qw-amber-deep); /* 6.20:1             */
+
+  /* JSON / query syntax highlighting. Distinct hues rather than shades: these
+     separate kinds of value, so lightness alone would not carry the meaning. */
+  --color-syntax-key: #1d4ed8;    /* 6.70:1 on surface / 5.36:1 on active */
+  --color-syntax-string: #0a7c42; /* 5.28:1 / 4.22:1                      */
+  --color-syntax-number: #b15209; /* was #b45309: 4.40:1 on sunken        */
+  --color-syntax-boolean: #7c3aed;/* 5.70:1 / 4.55:1                      */
+  --color-syntax-null: var(--color-text-subtle);
+
+  /* Search hit. Bright fill plus an explicit text colour: inheriting the
+     surrounding colour is what made highlights unreadable in dark mode. */
+  --color-highlight-bg: #fde68a;
+  --color-highlight-text: #14161a;
+
+  --color-focus: var(--qw-blue-ink);
+
+  /* Elevation. Shallow on purpose: a dense UI with heavy shadows turns to
+     mush. */
+  --shadow-sm: 0 1px 2px rgba(15, 17, 23, 0.06);
+  --shadow-md: 0 2px 6px rgba(15, 17, 23, 0.08), 0 1px 2px rgba(15, 17, 23, 0.04);
+  --shadow-lg: 0 8px 24px rgba(15, 17, 23, 0.12), 0 2px 6px rgba(15, 17, 23, 0.06);
+}
+
+/* ---------- 2b. SEMANTIC - DARK ----------------------------------------- */
+/* App.jsx toggles .dark-mode on <html>, so this is the one place the dark
+   theme is defined. Component files must not add .dark-mode rules. */
+
+:root.dark-mode {
+  color-scheme: dark;
+
+  --color-canvas: var(--qw-n-900);
+  --color-surface: var(--qw-n-850);
+  --color-surface-sunken: var(--qw-n-900);
+  --color-surface-raised: var(--qw-n-800);
+  --color-surface-hover: var(--qw-n-800);
+  --color-surface-active: var(--qw-n-700);
+  --color-overlay: rgba(0, 0, 0, 0.6);
+
+  --color-text: #e8eaed;        /* 14.56:1 on surface        */
+  --color-text-muted: #a2aab6;  /*  7.49:1                   */
+  --color-text-subtle: #828b98; /*  5.10:1                   */
+  --color-text-inverse: var(--qw-n-900);
+  --color-text-on-accent: var(--qw-n-950);
+
+  --color-border: var(--qw-n-700);
+  --color-border-strong: #3a4150;
+  --color-divider: var(--qw-n-800);
+
+  --color-primary: var(--qw-blue-lift);
+  --color-primary-hover: var(--qw-blue-lift-hover);
+  --color-primary-wash: var(--qw-blue-wash-dark);
+  --color-on-primary: var(--qw-n-950);
+
+  --color-brand: var(--qw-brand-lift);
+  --color-brand-wash: var(--qw-brand-wash-dark);
+
+  --color-danger: var(--qw-red-lift);
+  --color-success: var(--qw-green-lift);
+  --color-warning: var(--qw-amber-lift);
+  --color-warning-hover: var(--qw-amber-lift-hover);
+  --color-info: var(--qw-blue-lift);
+
+  --color-danger-wash: rgba(248, 113, 113, 0.16);
+  --color-success-wash: rgba(74, 222, 128, 0.16);
+  --color-warning-wash: rgba(251, 191, 36, 0.16);
+
+  /* On a dark wash the deep light-mode tones would be near-black on near-black
+     (1.6:1). The lift steps are already tuned for these surfaces. */
+  --color-on-danger-wash: var(--qw-red-lift);    /* 5.02:1 on the tint */
+  --color-on-success-wash: var(--qw-green-lift); /* 7.15:1             */
+  --color-on-info-wash: var(--qw-blue-lift);     /* 4.92:1             */
+  --color-on-warning-wash: var(--qw-amber-lift); /* 7.40:1             */
+
+  --color-syntax-key: #93c5fd;
+  --color-syntax-string: #6ee7a8;
+  --color-syntax-number: #fbbf24;
+  --color-syntax-boolean: #c4b5fd;
+  --color-syntax-null: var(--color-text-subtle);
+
+  --color-highlight-bg: rgba(251, 191, 36, 0.32);
+  --color-highlight-text: var(--color-text);
+
+  --color-focus: var(--qw-blue-lift);
+
+  /* Dark surfaces separate by lightness rather than shadow, so shadows are
+     left to lift true overlays off the page. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- 3. COMPONENT ------------------------------------------------- */
+
+:root {
+  --header-height: 56px;
+  --sidebar-width: 240px;
+  --table-row-height: 36px;
+  --card-padding: var(--space-3);
+  --grid-gap: var(--space-2);
+
+  --control-height-sm: 26px;
+  --control-height: 32px;
+  --control-height-lg: 38px;
+  --control-padding-x: var(--space-3);
+}
+
+/* ---------- Reduced motion ---------------------------------------------- */
+/* Durations collapse to 1ms rather than 0s: a few transitionend handlers would
+   never fire if transitions were removed outright. */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 1ms;
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

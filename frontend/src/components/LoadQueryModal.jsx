@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import './LoadQueryModal.css'
+import { IconTrash } from './Icon'
 
 function LoadQueryModal({ savedQueries, onLoad, onDelete, onClose, currentQueryId }) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -104,7 +105,7 @@ function LoadQueryModal({ savedQueries, onLoad, onDelete, onClose, currentQueryI
                       }}
                       title={isDeleteConfirm ? 'Click again to confirm' : 'Delete query'}
                     >
-                      {isDeleteConfirm ? 'Confirm?' : '🗑'}
+                      {isDeleteConfirm ? 'Confirm?' : <IconTrash />}
                     </button>
                   </div>
                 )

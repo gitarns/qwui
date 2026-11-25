@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - helm/qwui/Chart.yaml
+  # Also runnable by hand, e.g. to republish after enabling Actions.
+  workflow_dispatch:
 
 jobs:
   release:

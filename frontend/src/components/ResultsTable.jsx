@@ -2,6 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import ReactJson from '@microlink/react-json-view'
 import './ResultsTable.css'
+import {
+  IconSettings,
+  IconClipboard,
+  IconCheck,
+  IconFilterIn,
+  IconFilterOut,
+} from './Icon'
 
 function extractHighlightTerms(query) {
   if (!query || query.trim() === '*') return { globalTerms: [], fieldTerms: {} }
@@ -329,6 +336,14 @@ function ResultsTable({ results, loading, liveMode = false, onExpandedChange, ti
   }
 
 
+  // One definition for the header and the rows: they must agree, and the two
+  // inline copies this replaces had already drifted from the stylesheet.
+  // The time column is max-content because a full timestamp needs about 226px in
+  // the mono face, and a fixed 200px made it run under the next column.
+  const gridTemplate = selectedColumns.length === 0
+    ? 'auto max-content 1fr'
+    : `auto max-content repeat(${selectedColumns.length}, minmax(200px, 1fr))`
+
   return (
     <div className="results-container" style={{ fontSize: `${fontSize}px` }}>
       <div className="results-table" ref={scrollContainerRef}>
@@ -337,9 +352,7 @@ function ResultsTable({ results, loading, liveMode = false, onExpandedChange, ti
             <div
               className="results-list-header"
               style={{
-                gridTemplateColumns: selectedColumns.length === 0
-                  ? 'auto 200px 1fr'
-                  : `auto 200px repeat(${selectedColumns.length}, minmax(200px, 1fr))`
+                gridTemplateColumns: gridTemplate
               }}
             >
               <div className="header-expand"></div>
@@ -403,9 +416,7 @@ function ResultsTable({ results, loading, liveMode = false, onExpandedChange, ti
                     className="result-row"
                     onClick={() => toggleRow(index)}
                     style={{
-                      gridTemplateColumns: selectedColumns.length === 0
-                        ? 'auto 200px 1fr'
-                        : `auto 200px repeat(${selectedColumns.length}, minmax(200px, 1fr))`,
+                      gridTemplateColumns: gridTemplate,
                       fontSize: `${fontSize}px`
                     }}
                   >
@@ -511,8 +522,9 @@ function ResultsTable({ results, loading, liveMode = false, onExpandedChange, ti
                                             onFilterChange && onFilterChange(key, value, 'include')
                                           }}
                                           title="Filter for value"
+                                          aria-label="Filter for value"
                                         >
-                                          ⊕
+                                          <IconFilterIn />
                                         </button>
                                         <button
                                           className="action-btn filter-out-btn"
@@ -521,8 +533,9 @@ function ResultsTable({ results, loading, liveMode = false, onExpandedChange, ti
                                             onFilterChange && onFilterChange(key, value, 'exclude')
                                           }}
                                           title="Filter out value"
+                                          aria-label="Filter out value"
                                         >
-                                          ⊖
+                                          <IconFilterOut />
                                         </button>
                                         <button
                                           className={`action-btn toggle-column-btn ${isColumnSelected ? 'selected' : ''}`}
@@ -531,8 +544,9 @@ function ResultsTable({ results, loading, liveMode = false, onExpandedChange, ti
                                             onToggleColumn && onToggleColumn(key)
                                           }}
                                           title={isColumnSelected ? 'Remove column' : 'Toggle column'}
+                                          aria-label={isColumnSelected ? 'Remove column' : 'Toggle column'}
                                         >
-                                          ⚙
+                                          <IconSettings />
                                         </button>
                                       </div>
                                     </td>
@@ -556,7 +570,17 @@ function ResultsTable({ results, loading, liveMode = false, onExpandedChange, ti
                               }}
                               title="Copy JSON to clipboard"
                             >
-                              {copiedIndex === index ? '✓ Copied!' : '📋 Copy'}
+                              {copiedIndex === index ? (
+                                <>
+                                  <IconCheck />
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <IconClipboard />
+                                  Copy
+                                </>
+                              )}
                             </button>
                             <div className="json-view" style={{ fontSize: `${fontSize}px` }}>
                               <ReactJson

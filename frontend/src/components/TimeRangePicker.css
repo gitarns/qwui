@@ -14,12 +14,12 @@
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .time-range-button:hover {
-  border-color: #006bb4;
-  box-shadow: 0 2px 6px rgba(0, 107, 180, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
@@ -31,8 +31,13 @@
   border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 0.25rem 0.5rem;
-  min-width: 480px;
-  width: 480px;
+  min-height: var(--control-height-lg);
+  /* Sized to its label rather than a fixed 480px, which the search query paid
+     for on every screen. The floor keeps the 500px quick-select dropdown, which
+     hangs from this box's left edge, inside the window: the Search and Live
+     buttons always sit to the right of it. */
+  min-width: 22rem;
+  white-space: nowrap;
 }
 
 .calendar-quick-select-btn {
@@ -54,7 +59,7 @@
 }
 
 .calendar-quick-select-btn:hover {
-  background: rgba(0, 107, 180, 0.1);
+  background: var(--color-primary-wash);
 }
 
 .time-part {
@@ -69,7 +74,7 @@
 }
 
 .time-part:hover {
-  background: rgba(0, 107, 180, 0.1);
+  background: var(--color-primary-wash);
 }
 
 .time-separator {
@@ -93,7 +98,7 @@
 }
 
 .relative-range-display:hover {
-  background: rgba(0, 107, 180, 0.1);
+  background: var(--color-primary-wash);
 }
 
 /* Dropdowns */
@@ -165,8 +170,8 @@
 
 .custom-quick-input:focus {
   outline: none;
-  border-color: #006bb4;
-  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
 .custom-quick-select {
@@ -182,14 +187,14 @@
 
 .custom-quick-select:focus {
   outline: none;
-  border-color: #006bb4;
-  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
 .custom-quick-apply-btn {
   padding: 0.5rem 1rem;
-  background: #006bb4;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   border: none;
   border-radius: 4px;
   font-size: 0.875rem;
@@ -200,8 +205,8 @@
 }
 
 .custom-quick-apply-btn:hover:not(:disabled) {
-  background: #005a9e;
-  box-shadow: 0 2px 4px rgba(0, 107, 180, 0.3);
+  background: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .custom-quick-apply-btn:disabled {
@@ -234,8 +239,8 @@
 }
 
 .quick-range-btn:hover {
-  background: rgba(0, 107, 180, 0.1);
-  border-color: #006bb4;
+  background: var(--color-primary-wash);
+  border-color: var(--color-primary);
 }
 
 /* Time Popup */
@@ -249,6 +254,9 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
   z-index: 1000;
   min-width: 350px;
+  /* Its own width, not the picker's: shrink-to-fit would otherwise cap it at
+     the picker box and push the time list under the calendar. */
+  width: max-content;
   animation: slideDown 0.15s ease-out;
 }
 
@@ -286,9 +294,9 @@
 }
 
 .time-tab.active {
-  color: white;
-  background-color: #006bb4;
-  box-shadow: 0 2px 4px rgba(0, 107, 180, 0.3);
+  color: var(--color-on-primary);
+  background-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
 /* Tab Content */
@@ -322,17 +330,22 @@
 }
 
 .react-datepicker__day:hover {
-  background-color: rgba(0, 107, 180, 0.1);
+  background-color: var(--color-primary-wash);
 }
 
 .react-datepicker__day--selected,
 .react-datepicker__day--keyboard-selected {
-  background-color: #006bb4;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 .react-datepicker__time-container {
   border-left: 1px solid var(--border-color);
+}
+
+/* The library paints this header black, which vanished on the dark theme. */
+.react-datepicker-time__header {
+  color: var(--text-primary);
 }
 
 .react-datepicker__time-box {
@@ -344,20 +357,12 @@
 }
 
 .react-datepicker__time-list-item:hover {
-  background-color: rgba(0, 107, 180, 0.1);
+  background-color: var(--color-primary-wash);
 }
 
 .react-datepicker__time-list-item--selected {
-  background-color: #006bb4;
-  color: white;
-}
-
-.dark-mode .react-datepicker__time-box {
-  background: #3d3d3d;
-}
-
-.dark-mode .react-datepicker__time-list-item {
-  color: #f3f4f6;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 /* Relative Tab */
@@ -397,8 +402,8 @@
 .relative-unit:focus,
 .relative-direction:focus {
   outline: none;
-  border-color: #006bb4;
-  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
 /* Now Tab */
@@ -423,8 +428,8 @@
 
 .apply-btn {
   padding: 0.5rem 1.5rem;
-  background: #006bb4;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   border: none;
   border-radius: 4px;
   font-size: 0.875rem;
@@ -433,12 +438,12 @@
   transition: all 0.2s ease;
 }
 
-.apply-btn:hover {
-  background: #005a9e;
-  box-shadow: 0 2px 4px rgba(0, 107, 180, 0.3);
+.apply-btn:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
 }
 
-.apply-btn:active {
+.apply-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
 
@@ -469,11 +474,33 @@
   border-radius: 4px;
   color: var(--text-primary);
   font-size: 0.875rem;
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: var(--qw-font-mono);
 }
 
 .manual-date-input:focus {
   outline: none;
-  border-color: #006bb4;
-  box-shadow: 0 0 0 3px rgba(0, 107, 180, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.manual-date-input.invalid,
+.manual-date-input.invalid:focus {
+  border-color: var(--color-danger);
+}
+
+.manual-date-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.manual-date-hint.invalid {
+  color: var(--color-danger);
+}
+
+.apply-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }

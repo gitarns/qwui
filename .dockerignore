@@ -1,0 +1,13 @@
+node_modules
+frontend/node_modules
+frontend/dist
+dist
+rust-backend/target
+.git
+dev
+k6
+*.md
+
+# Never bake local secrets into an image
+.env
+.env.local
