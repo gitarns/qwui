@@ -67,3 +67,19 @@ extraEnvFrom: []
 #     name: my-secret
 # - configMapRef:
 #     name: my-configmap
+
+# OIDC provider reached by qwui through another URL than the browser, with a
+# private CA (e.g. Argo CD's Dex through its in-cluster Service). The rest of
+# the OIDC settings go through extraEnv / extraEnvFrom.
+oidc:
+  # OIDC_INTERNAL_URL: replaces OIDC_ISSUER in qwui's own calls (discovery,
+  # token, keys). Empty: qwui calls OIDC_ISSUER.
+  internalUrl: ""
+  # Secret holding a PEM CA bundle, mounted and passed as OIDC_CA_FILE.
+  caSecret:
+    name: ""
+    key: ca.crt
+
+# Extra volumes and mounts for the qwui container.
+extraVolumes: []
+extraVolumeMounts: []

@@ -276,6 +276,8 @@ Quickwit upgrades.
 | `OIDC_ISSUER` | — | OIDC issuer URL |
 | `OIDC_REDIRECT_URL` | — | OIDC redirect URL |
 | `OIDC_POST_LOGOUT_REDIRECT_URL` | — | Where the provider returns after logout (see [Logout](#logout)) |
+| `OIDC_INTERNAL_URL` | — | Base URL replacing `OIDC_ISSUER` in qwui's own calls to the provider (see [Provider reachable through an internal URL](#provider-reachable-through-an-internal-url)) |
+| `OIDC_CA_FILE` | — | PEM bundle trusted, in addition to the system CAs, for qwui's calls to the provider |
 | `SESSION_SECRET` | — | Cookie session secret |
 | `LOG_LEVEL` | `info` | Backend log level |
 | `ORIGIN` | — | Comma-separated allowed CORS origins |
@@ -290,6 +292,37 @@ Quickwit upgrades.
 | `MCP_MAX_CONCURRENT_REQUESTS` | _probed_ | Overrides the concurrency derived from Quickwit's own reported capacity |
 
 Copy [.env.example](.env.example) to `.env` to get started. `.env` is gitignored — never commit real secrets.
+
+## Startup and readiness
+
+With OIDC enabled, qwui discovers the provider in the background and retries
+with a backoff (2 s doubling to 60 s) while it is unreachable: the server
+starts anyway, `/ready` answers 503 and `/login` answers 503 with
+`Retry-After` until discovery succeeds. A malformed `OIDC_ISSUER` or
+`OIDC_REDIRECT_URL`, or an unreadable `OIDC_CA_FILE`, still stops qwui at
+startup. The Helm chart's readiness probe uses `/ready`.
+
+## Provider reachable through an internal URL
+
+The browser and qwui do not always reach the provider the same way: in
+Kubernetes, the issuer is often a public or VPN-only URL the pod cannot
+resolve, while the provider answers in-cluster on its Service, with a
+certificate from a private CA. For example, with Argo CD's Dex:
+
+```
+OIDC_ISSUER=https://argocd.example.com/api/dex
+OIDC_INTERNAL_URL=https://argocd-dex-server.argocd.svc.cluster.local:5556/api/dex
+OIDC_CA_FILE=/etc/qwui/oidc-ca/ca.crt
+```
+
+`OIDC_ISSUER` remains the provider's identity: the `iss` of its tokens, and the
+base of the URLs the browser is sent to (login, logout), which qwui never
+fetches itself. For every URL qwui fetches itself (discovery document, token
+endpoint, keys), an `OIDC_ISSUER` prefix is replaced with `OIDC_INTERNAL_URL`.
+The discovery document still names the public issuer, so the issuer check
+passes. Only a whole prefix is replaced: the issuer itself, or followed by
+`/` or `?`. Endpoints the provider publishes under another host are called
+as published.
 
 ## Logout
 
@@ -348,6 +381,9 @@ helm install qwui qwui/qwui \
 | `maxExportDocs` | — | Overrides `MAX_EXPORT_DOCS` (backend default 10000) |
 | `ingress.enabled` | `false` | Enable ingress |
 | `extraEnv` / `extraEnvFrom` | `[]` | Extra environment variables, e.g. OIDC settings |
+| `oidc.internalUrl` | — | Sets `OIDC_INTERNAL_URL` |
+| `oidc.caSecret.name` / `.key` | — / `ca.crt` | Secret holding the provider's CA: mounted and passed as `OIDC_CA_FILE` |
+| `extraVolumes` / `extraVolumeMounts` | `[]` | Extra volumes and mounts for the qwui container |
 
 OIDC is configured through `extraEnv` / `extraEnvFrom` — keep
 `OIDC_CLIENT_SECRET` and `SESSION_SECRET` in a Kubernetes Secret and reference
